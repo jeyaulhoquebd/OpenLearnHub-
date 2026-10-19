@@ -4,8 +4,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { getDb } from '../firebase.js';
-import { optionalAuth } from '../middleware/auth.js';
+import { optionalAuth, requireVerifiedEmail } from '../middleware/auth.js';
 import { apiError } from '../lib/http.js';
+import { sanitizeEmail, sanitizeText, sanitizeUrl } from '../lib/validation.js';
 
 const reportSchema = z.object({
   resourceId: z.string().trim().min(1).max(160),
@@ -34,7 +35,7 @@ const reportLimiter = rateLimit({
   }
 });
 
-reportsRouter.post('/', optionalAuth, reportLimiter, async (req, res, next) => {
+reportsRouter.post('/', optionalAuth, requireVerifiedEmail, reportLimiter, async (req, res, next) => {
   try {
     const parsed = reportSchema.safeParse(req.body || {});
     if (!parsed.success) {
@@ -52,20 +53,32 @@ reportsRouter.post('/', optionalAuth, reportLimiter, async (req, res, next) => {
     }
 
     const payload = parsed.data;
-    const doc = await db.collection('reports').add({
-      resourceId: payload.resourceId,
-      resourceTitle: payload.resourceTitle,
-      resourceType: payload.resourceType,
-      resourceUrl: payload.resourceUrl,
-      reason: payload.reason,
-      details: payload.details,
-      reporterUid: req.user?.uid || null,
-      reporterEmail: req.user?.email || payload.email || null,
-      locale: payload.locale,
-      status: 'open',
-      userAgent: String(req.headers['user-agent'] || '').slice(0, 220),
-      createdAt: FieldValue.serverTimestamp()
-    });
+    let doc;
+    try {
+      doc = await db.collection('reports').add({
+        resourceId: sanitizeText(payload.resourceId, { max: 160 }),
+        resourceTitle: sanitizeText(payload.resourceTitle, { max: 220 }),
+        resourceType: payload.resourceType,
+        resourceUrl: sanitizeUrl(payload.resourceUrl, 600),
+        reason: payload.reason,
+        details: sanitizeText(payload.details, { max: 1000, multiline: true }),
+        reporterUid: req.user?.uid || null,
+        reporterEmail: req.user?.email || sanitizeEmail(payload.email) || null,
+        locale: sanitizeText(payload.locale, { max: 8 }),
+        status: 'open',
+        verifiedReporter: req.user ? req.user.email_verified === true : false,
+        userAgent: sanitizeText(req.headers['user-agent'] || '', { max: 220 }),
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch (error) {
+      console.error('[reports] Could not store report:', error?.message || error);
+      return apiError(
+        res,
+        503,
+        'database_unavailable',
+        'Report storage is unavailable right now. Please try again later or email us directly.'
+      );
+    }
 
     return res.status(201).json({ ok: true, id: doc.id });
   } catch (error) {

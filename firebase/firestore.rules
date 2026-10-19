@@ -26,6 +26,11 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
+    // Composite id convention: "<ownerUid>_<resourceId>".
+    function ownedDocId(uid, resourceId) {
+      return uid + '_' + resourceId;
+    }
+
     // ---------- resources ----------
     // Published resources are public. Pending/rejected resources are visible
     // only to their submitter and to admins. Only admins may publish, edit,
@@ -66,31 +71,90 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- categories & alternatives (admin-managed) ----------
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /alternatives/{alternativeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ---------- user profiles ----------
-    // A user can read and edit only their own profile, and can never promote
-    // themselves to admin. Admins can manage roles.
+    // A user can read and edit only their own profile. `role` is never a
+    // client-writable field: admin access comes from the `admin` custom claim
+    // (see server/scripts/set-admin.js), and owners cannot change any role.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
 
       allow create: if
         isOwner(userId) &&
         request.resource.data.uid == userId &&
-        request.resource.data.role == 'user';
+        request.resource.data.get('role', 'user') == 'user' &&
+        (!('displayName' in request.resource.data) ||
+          request.resource.data.displayName.size() <= 80) &&
+        (!('preferredLanguage' in request.resource.data) ||
+          request.resource.data.preferredLanguage in ['en', 'bn', 'ur']);
 
       allow update: if
         isAdmin() ||
         (
           isOwner(userId) &&
           request.resource.data.uid == resource.data.uid &&
-          request.resource.data.role == resource.data.role
+          request.resource.data.get('role', 'user') == resource.data.get('role', 'user')
         );
 
-      allow delete: if isAdmin();
+      // Owners may delete their own account (the delete-account flow).
+      allow delete: if isOwner(userId) || isAdmin();
 
-      // Personal saved resources. Private to the owner.
+      // Legacy personal saved resources. Private to the owner.
       match /bookmarks/{resourceId} {
         allow read, write: if isOwner(userId);
       }
+    }
+
+    // ---------- bookmarks (userId_resourceId) ----------
+    match /bookmarks/{bookmarkId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if
+        isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.id == bookmarkId &&
+        bookmarkId == ownedDocId(request.auth.uid, request.resource.data.resourceId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ---------- progress (userId_resourceId) ----------
+    match /progress/{progressId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update: if
+        isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        progressId == ownedDocId(request.auth.uid, request.resource.data.resourceId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------- reviews ----------
+    // Anyone can read published reviews. Signed-in, email-verified users may
+    // post exactly one review per resource, edit it, or delete their own.
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create: if
+        isSignedIn() &&
+        request.auth.token.email_verified == true &&
+        request.resource.data.userId == request.auth.uid &&
+        reviewId == ownedDocId(request.resource.data.resourceId, request.auth.uid) &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        isNonEmptyString(request.resource.data.body) &&
+        request.resource.data.body.size() <= 2000;
+
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ---------- reports ----------

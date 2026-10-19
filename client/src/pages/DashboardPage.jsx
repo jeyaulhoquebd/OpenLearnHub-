@@ -6,22 +6,26 @@ import {
   Bookmark,
   CheckCircle2,
   Clock3,
+  Globe,
   LayoutDashboard,
-  MailCheck,
+  Loader2,
   Plus,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UploadCloud,
   UserRound,
   XCircle
 } from 'lucide-react';
 import ResourceCard from '../components/ResourceCard';
 import EmptyState from '../components/EmptyState';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import { ResourceGridSkeleton } from '../components/LoadingStates';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { fetchBookmarks, fetchUserSubmissions } from '../lib/data';
+import { SUPPORTED_LANGUAGES } from '../lib/i18n';
 import { formatDate, initials } from '../lib/utils';
 
 const STATUS_META = {
@@ -32,14 +36,14 @@ const STATUS_META = {
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation();
-  const { user, profile, isAdmin, resendVerification, reloadUser } = useAuth();
+  const { user, profile, isAdmin, isVerified, provider, deleteAccount, updatePreferredLanguage } = useAuth();
   const { push } = useToast();
   const [params, setParams] = useSearchParams();
   const activeTab = params.get('tab') || 'saved';
   const [bookmarks, setBookmarks] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [resending, setResending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   usePageMeta(t('dashboard.title', { name: profile?.displayName || user?.displayName || '' }));
 
   const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Learner';
@@ -73,9 +77,9 @@ export default function DashboardPage() {
     () => [
       { label: t('dashboard.saved'), value: bookmarks.length, icon: Bookmark, tab: 'saved' },
       { label: t('dashboard.submissions'), value: submissions.length, icon: UploadCloud, tab: 'submissions' },
-      { label: t('dashboard.profile'), value: user?.emailVerified ? t('common.verified') : '—', icon: UserRound, tab: 'profile' }
+      { label: t('dashboard.profile'), value: isVerified ? t('common.verified') : '—', icon: UserRound, tab: 'profile' }
     ],
-    [bookmarks.length, submissions.length, t, user?.emailVerified]
+    [bookmarks.length, submissions.length, t, isVerified]
   );
 
   function setTab(tab) {
@@ -85,16 +89,24 @@ export default function DashboardPage() {
     setParams(next, { replace: true });
   }
 
-  async function handleResend() {
-    setResending(true);
+  async function handleDeleteAccount() {
+    if (!window.confirm(t('auth.deleteAccountConfirm'))) return;
+    setDeleting(true);
     try {
-      await resendVerification();
-      await reloadUser();
-      push(t('dashboard.resent'));
+      await deleteAccount();
+      push(t('auth.deleteAccountSuccess'));
+    } catch {
+      push(t('auth.requiresRecentLogin'), { type: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleLanguageChange(event) {
+    try {
+      await updatePreferredLanguage(event.target.value);
     } catch {
       push(t('auth.genericError'), { type: 'error' });
-    } finally {
-      setResending(false);
     }
   }
 
@@ -131,22 +143,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {user && !user.emailVerified && (
-            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10">
-              <div className="flex items-start gap-2.5">
-                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t('dashboard.verifyTitle')}</p>
-                  <p className="mt-0.5 text-xs text-amber-900 dark:text-amber-200">
-                    {t('dashboard.verifyText', { email: user.email })}
-                  </p>
-                </div>
-              </div>
-              <button type="button" onClick={handleResend} disabled={resending} className="btn-secondary btn-sm shrink-0">
-                {t('dashboard.resend')}
-              </button>
-            </div>
-          )}
+          <EmailVerificationBanner className="mt-6" />
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
             {stats.map((stat) => {
@@ -301,7 +298,7 @@ export default function DashboardPage() {
                   <div className="flex justify-between gap-4 py-3">
                     <dt className="text-ink-muted">{t('common.verified')}</dt>
                     <dd className="flex items-center gap-1.5 font-semibold text-ink">
-                      {user?.emailVerified ? (
+                      {isVerified ? (
                         <>
                           <CheckCircle2 className="h-4 w-4 text-brand-600" />
                           {t('common.verified')}
@@ -312,6 +309,32 @@ export default function DashboardPage() {
                           {t('dashboard.statusPending')}
                         </>
                       )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4 py-3">
+                    <dt className="text-ink-muted">{t('auth.signInMethod')}</dt>
+                    <dd className="font-semibold text-ink">
+                      {t(`auth.provider${provider.charAt(0).toUpperCase()}${provider.slice(1)}`)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 py-3">
+                    <dt className="flex items-center gap-1.5 text-ink-muted">
+                      <Globe className="h-3.5 w-3.5" />
+                      {t('auth.preferredLanguage')}
+                    </dt>
+                    <dd>
+                      <select
+                        value={profile?.preferredLanguage || i18n.language?.slice(0, 2) || 'en'}
+                        onChange={handleLanguageChange}
+                        aria-label={t('auth.preferredLanguage')}
+                        className="rounded-xl border border-sand-300 bg-surface px-3 py-1.5 text-sm font-semibold text-ink"
+                      >
+                        {SUPPORTED_LANGUAGES.map((language) => (
+                          <option key={language.code} value={language.code}>
+                            {language.label}
+                          </option>
+                        ))}
+                      </select>
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 py-3">
@@ -342,6 +365,23 @@ export default function DashboardPage() {
                     {t('assistant.name')}
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
+                </div>
+
+                <div className="rounded-3xl border border-red-200 bg-red-50/60 p-6 dark:border-red-500/30 dark:bg-red-500/10">
+                  <Trash2 className="h-6 w-6 text-red-600 dark:text-red-300" />
+                  <h2 className="mt-3 font-display text-xl font-semibold text-red-900 dark:text-red-200">
+                    {t('auth.deleteAccount')}
+                  </h2>
+                  <p className="mt-1.5 text-sm text-red-900/80 dark:text-red-200/80">{t('auth.deleteAccountText')}</p>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="btn-secondary mt-4 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/20"
+                  >
+                    {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    {t('auth.deleteAccountConfirm')}
+                  </button>
                 </div>
               </div>
             </div>

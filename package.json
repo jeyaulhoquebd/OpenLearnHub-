@@ -14,6 +14,7 @@
     "start": "npm run start -w server",
     "seed": "npm run seed -w server",
     "set-admin": "npm run set-admin -w server",
+    "check:i18n": "npm run check:i18n -w client",
     "preview": "npm run preview -w client"
   },
   "engines": {

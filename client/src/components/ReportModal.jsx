@@ -1,29 +1,38 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, X } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, CheckCircle2, Loader2, MailCheck, ShieldAlert, X } from 'lucide-react';
 import { REPORT_REASONS } from '../lib/constants';
 import { submitReport } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { reportSchema, sanitizeText } from '../lib/validation';
+import EmailVerificationBanner from './EmailVerificationBanner';
 
 export default function ReportModal({ open, onClose, resource }) {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
-  const [reason, setReason] = useState('');
-  const [details, setDetails] = useState('');
-  const [email, setEmail] = useState('');
+  const { user, isVerified } = useAuth();
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm({
+    resolver: zodResolver(reportSchema),
+    defaultValues: { reason: '', details: '', email: '' }
+  });
+
   useEffect(() => {
     if (open) {
-      setReason('');
-      setDetails('');
-      setEmail(user?.email || '');
+      reset({ reason: '', details: '', email: user?.email || '' });
       setStatus('idle');
       setErrorMessage('');
     }
-  }, [open, user?.email]);
+  }, [open, user?.email, reset]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -40,25 +49,21 @@ export default function ReportModal({ open, onClose, resource }) {
 
   if (!open || !resource) return null;
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!reason) {
-      setErrorMessage(t('report.requiredReason'));
-      return;
-    }
-    setStatus('submitting');
+  const needsVerification = Boolean(user && !isVerified);
+
+  async function onSubmit(values) {
     setErrorMessage('');
     try {
       const token = user ? await user.getIdToken() : undefined;
       await submitReport(
         {
           resourceId: resource.id,
-          resourceTitle: resource.title,
+          resourceTitle: sanitizeText(resource.title, { max: 220 }),
           resourceType: resource.type,
-          resourceUrl: resource.url,
-          reason,
-          details: details.trim(),
-          email: email.trim(),
+          resourceUrl: sanitizeText(resource.url, { max: 600 }),
+          reason: values.reason,
+          details: sanitizeText(values.details, { max: 1000, multiline: true }),
+          email: sanitizeText(values.email, { max: 200 }),
           locale: i18n.language
         },
         token
@@ -115,8 +120,24 @@ export default function ReportModal({ open, onClose, resource }) {
               {t('report.close')}
             </button>
           </div>
+        ) : needsVerification ? (
+          <div className="mt-6">
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              <MailCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-semibold">{t('auth.verifyRequiredTitle')}</p>
+                <p className="mt-1">{t('report.verifyRequiredText')}</p>
+              </div>
+            </div>
+            <EmailVerificationBanner className="mt-4" />
+            <div className="mt-5 text-end">
+              <button type="button" onClick={onClose} className="btn-secondary justify-center">
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
         ) : (
-          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+          <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="rounded-2xl bg-sand-100/80 px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                 {t('report.resource')}
@@ -131,9 +152,9 @@ export default function ReportModal({ open, onClose, resource }) {
               <select
                 id="report-reason"
                 className="input"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                required
+                aria-invalid={Boolean(errors.reason)}
+                aria-describedby={errors.reason ? 'report-reason-error' : undefined}
+                {...register('reason')}
               >
                 <option value="">{t('report.chooseReason')}</option>
                 {REPORT_REASONS.map((item) => (
@@ -142,6 +163,11 @@ export default function ReportModal({ open, onClose, resource }) {
                   </option>
                 ))}
               </select>
+              {errors.reason && (
+                <p id="report-reason-error" role="alert" className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-300">
+                  {t(errors.reason.message)}
+                </p>
+              )}
             </div>
 
             <div>
@@ -152,10 +178,14 @@ export default function ReportModal({ open, onClose, resource }) {
                 id="report-details"
                 className="input min-h-[108px] resize-y"
                 maxLength={1000}
-                value={details}
-                onChange={(event) => setDetails(event.target.value)}
                 placeholder={t('report.detailsPlaceholder')}
+                {...register('details')}
               />
+              {errors.details && (
+                <p role="alert" className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-300">
+                  {t(errors.details.message)}
+                </p>
+              )}
             </div>
 
             <div>
@@ -166,15 +196,22 @@ export default function ReportModal({ open, onClose, resource }) {
                 id="report-email"
                 type="email"
                 className="input"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@example.com"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'report-email-error' : undefined}
+                {...register('email')}
               />
-              <p className="mt-1.5 text-xs text-ink-muted">{t('report.emailHint')}</p>
+              {errors.email ? (
+                <p id="report-email-error" role="alert" className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-300">
+                  {t(errors.email.message)}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs text-ink-muted">{t('report.emailHint')}</p>
+              )}
             </div>
 
             {errorMessage && (
-              <p className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 {errorMessage}
               </p>
@@ -188,8 +225,8 @@ export default function ReportModal({ open, onClose, resource }) {
               <button type="button" onClick={onClose} className="btn-secondary justify-center">
                 {t('common.cancel')}
               </button>
-              <button type="submit" className="btn-primary justify-center" disabled={status === 'submitting'}>
-                {status === 'submitting' ? (
+              <button type="submit" className="btn-primary justify-center" disabled={isSubmitting}>
+                {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t('report.sending')}

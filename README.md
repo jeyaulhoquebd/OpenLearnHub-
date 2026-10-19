@@ -22,6 +22,7 @@ OpenLearn Hub lists free courses, lawfully available books (open textbooks, publ
 - [API](#api)
 - [Deployment](#deployment)
 - [Moderation workflow](#moderation-workflow)
+- [Authentication](#authentication)
 - [Translations and RTL](#translations-and-rtl)
 - [Scripts](#scripts)
 - [Troubleshooting](#troubleshooting)
@@ -126,7 +127,7 @@ There are **no Cloud Functions**. The API is a normal Express service so it can 
 - **Node.js 20+** and npm 9+
 - A **Firebase project** (Blaze plan is not required for Hosting/Firestore/Storage at this scale, but check current quotas)
 - **Firebase CLI** for rules and hosting: `npm install -g firebase-tools` (or use `npx firebase-tools`)
-- Optional: an OpenAI-compatible API key for LearnMate
+- Optional: a **Google Gemini API key** for LearnMate
 
 ## Quick start
 
@@ -153,7 +154,7 @@ Without `.env` files you get preview mode. To enable accounts and moderation, co
 
 ### 2. Enable products
 
-- **Authentication** → Sign-in method → enable **Email/Password** and **Google**.
+- **Authentication** → Sign-in method → enable **Email/Password**, **Google**, **GitHub**, and **Apple**.
 - **Firestore Database** → create a database (production mode is fine; rules come next).
 - **Storage** → create a bucket (used only for optional thumbnails).
 
@@ -163,7 +164,7 @@ Without `.env` files you get preview mode. To enable accounts and moderation, co
 cp client/.env.example client/.env
 ```
 
-Fill in the six `VITE_FIREBASE_*` values from the web app config. Keep `VITE_API_URL=http://localhost:8080` for local development.
+Fill in the six required `VITE_FIREBASE_*` values from the web app config (`VITE_FIREBASE_MEASUREMENT_ID` is optional — it only enables Analytics in production builds). Keep `VITE_API_URL=http://localhost:8080` for local development.
 
 > `VITE_*` values are **public** by design (they identify the Firebase project). They are not secrets. Never put the LLM key or a service-account key in a `VITE_*` variable.
 
@@ -183,7 +184,17 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...","priv
 
 Keep the JSON on one line and leave the `\n` sequences escaped.
 
-**Option B — point to a file (local development):**
+**Option B — three discrete values (also good for Render/Railway/Cloud Run):**
+
+```dotenv
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Keep the `\n` sequences in `FIREBASE_PRIVATE_KEY` escaped on a single line.
+
+**Option C — point to a file (local development):**
 
 ```dotenv
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json
@@ -222,7 +233,7 @@ npm run set-admin -w server -- --email=you@example.com
 # or: cd server && npm run set-admin -- --email=you@example.com
 ```
 
-The script sets both a custom claim (`admin: true`) and `users/{uid}.role = "admin"`. **Sign out and back in** so the new token claim is applied, then open `/admin`.
+The script sets the `admin: true` **custom claim**. **Sign out and back in** (or refresh the ID token) so the new claim is applied, then open `/admin`. The client reads admin rights from `getIdTokenResult()` — there is no client-writable `role` field.
 
 ### 8. Run
 
@@ -333,21 +344,34 @@ Leaving the six required Firebase values empty is supported and enables preview 
 
 ### `users/{uid}` and `users/{uid}/bookmarks/{resourceId}`
 
-- Profiles are readable/writable only by their owner (admins can read/manage roles).
-- Users cannot promote themselves; `role` must stay unchanged on self-update.
+- Profiles are readable/writable only by their owner; the profile stores `displayName`, `email`, `photoURL`, `provider`, `preferredLanguage`, and timestamps.
+- Users **cannot** set or change `role` — admin access comes from the `admin` custom claim. The client never writes a role.
+- Owners may delete their own profile (the delete-account flow).
 - Bookmarks are private to the owner.
+
+### Refined collections
+
+| Collection | Read | Write |
+| --- | --- | --- |
+| `categories/{id}`, `alternatives/{id}` | public | admins only |
+| `bookmarks/{userId_resourceId}`, `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
+| `reviews/{resourceId_userId}` | public | verified, signed-in owner (one review per resource) |
+| `reports/{id}` | admins | **created by the Express API only** |
 
 ### `reports/{reportId}`
 
 - Readable and updatable by admins only.
 - **Writes are disabled for clients** (`allow create: if false`). Reports are created by the Express API using the Admin SDK, which validates the payload and bypasses rules. This prevents spam and forged reports.
+- Signed-in reporters must have a verified email; anonymous copyright notices are still accepted and stored with `verifiedReporter: false`.
 
 ### Rules summary
 
 - Published resources: public read.
 - Pending/rejected resources: visible to the submitter and admins only.
 - Resource create: signed-in user, `status: "pending"`, `featured: false`, HTTPS URL, required fields, length limits.
-- Resource update/delete: admins only.
+- Resource update/delete, categories, alternatives: admins only.
+- Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
+- Reviews: verified email required, one per resource, owner-only edits.
 - Storage: images under 2 MB, thumbnail paths only.
 - Default deny for everything else.
 
@@ -473,9 +497,22 @@ Admin access requires either the `admin` custom claim or `users/{uid}.role === "
 ## Translations and RTL
 
 - Locales live in `client/src/locales/{en,bn,ur}.json`.
-- The switcher stores the choice in `localStorage` under `openlearn.language`.
+- The switcher stores the choice in `localStorage` under `openlearn.language` and, for signed-in users, in `users/{uid}.preferredLanguage`.
 - Urdu sets `<html lang="ur" dir="rtl">` and a `lang-urdu` body class; layouts use logical properties (`ms-*`, `me-*`, `start-*`, `end-*`) so they mirror correctly.
+- `npm run check:i18n` verifies that **en, bn, and ur have identical key sets** and that **every key used in the UI exists in all three files**. It exits non-zero on any gap, so it can gate CI.
 - To add a language: add the JSON file, register it in `client/src/lib/i18n.js`, and add it to `SUPPORTED_LANGUAGES` (used by the switcher). Resource titles/descriptions may be strings or `{ en, bn, ur }` maps; `localized()` in `client/src/lib/utils.js` resolves either shape and falls back to English.
+
+## Authentication
+
+Four sign-in methods: **Email/Password, Google, GitHub, Apple** (`signInWithPopup`, with a `signInWithRedirect` fallback when the popup is blocked or on mobile). Social users are treated as email-verified.
+
+- Email/password sign-up sends a verification email. Until `emailVerified` is true, the app shows a "Verify your email" banner with a 60-second resend cooldown and an "I've verified" button that reloads the Firebase user.
+- `auth/account-exists-with-different-credential` is handled explicitly: the app tells the user which provider the account uses and links the new credential with `linkWithCredential()` after they sign in with the original method.
+- All common Firebase error codes map to friendly, translated messages (`client/src/lib/authErrors.js`).
+- Forgot-password uses `sendPasswordResetEmail`; the dashboard offers a **delete-account** action.
+- **Protected routes:** dashboard, submit, admin, and the AI assistant require sign-in. Posting **reviews and reports** additionally requires a verified email.
+
+Text inputs are validated on the client with **zod + react-hook-form** (`client/src/lib/validation.js`) and on the server with **zod** (`server/src/routes/*`), then sanitised (`sanitizeText`) before storage. User content is only ever rendered as text — there is no `dangerouslySetInnerHTML`.
 
 ## Design system
 
@@ -495,7 +532,8 @@ From the repository root:
 | `npm run preview` | Serve the built client on 4173 |
 | `npm start` | Start the API only |
 | `npm run seed` | Seed Firestore with the curated library |
-| `npm run set-admin -w server -- --email=…` | Grant admin to an existing user |
+| `npm run set-admin -w server -- --email=…` | Grant admin (custom claim) to an existing user |
+| `npm run check:i18n` | Fail if any en/bn/ur translation key is missing |
 
 ## Troubleshooting
 

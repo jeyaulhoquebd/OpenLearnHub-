@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { submitResource } from '../lib/data';
 import { CATEGORIES, COUNTRIES, LANGUAGES, LEVELS, PLATFORMS } from '../lib/constants';
-import { isValidHttpsUrl } from '../lib/utils';
+import { sanitizeText, submitResourceSchema } from '../lib/validation';
 import { usePageMeta } from '../hooks/usePageMeta';
 
 const TYPE_OPTIONS = [
@@ -137,30 +137,12 @@ export default function SubmitResourcePage() {
     event.preventDefault();
     setError('');
 
-    if (!form.title.trim() || !form.provider.trim() || !form.url.trim() || !form.description.trim() || !form.licenseNote.trim()) {
-      setError(t('submit.validationRequired'));
+    const parsed = submitResourceSchema.safeParse({ ...form, legalConfirmed, officialConfirmed });
+    if (!parsed.success) {
+      setError(t(parsed.error.issues[0].message));
       return;
     }
-    if (!isValidHttpsUrl(form.url.trim())) {
-      setError(t('submit.validationUrl'));
-      return;
-    }
-    if (form.description.trim().length < 40) {
-      setError(t('submit.validationDescription'));
-      return;
-    }
-    if (form.languages.length === 0) {
-      setError(t('submit.validationLanguages'));
-      return;
-    }
-    if (form.countries.length === 0) {
-      setError(t('submit.validationCountries'));
-      return;
-    }
-    if (!legalConfirmed || !officialConfirmed) {
-      setError(t('submit.validationLegal'));
-      return;
-    }
+    const data = parsed.data;
 
     setSubmitting(true);
     try {
@@ -169,16 +151,16 @@ export default function SubmitResourcePage() {
         email: user.email,
         thumbnailFile: thumbnail,
         values: {
-          ...form,
-          title: form.title.trim(),
-          provider: form.provider.trim(),
-          url: form.url.trim(),
-          description: form.description.trim(),
-          longDescription: form.longDescription.trim(),
-          licenseNote: form.licenseNote.trim(),
-          licenseUrl: form.licenseUrl.trim(),
-          author: form.author.trim(),
-          tags: form.tags
+          ...data,
+          title: sanitizeText(data.title, { max: 140 }),
+          provider: sanitizeText(data.provider, { max: 120 }),
+          url: sanitizeText(data.url, { max: 600 }),
+          author: sanitizeText(data.author, { max: 120 }),
+          description: sanitizeText(data.description, { max: 420, multiline: true }),
+          longDescription: sanitizeText(data.longDescription, { max: 2000, multiline: true }),
+          licenseNote: sanitizeText(data.licenseNote, { max: 160 }),
+          licenseUrl: sanitizeText(data.licenseUrl, { max: 600 }),
+          tags: sanitizeText(data.tags, { max: 200 })
             .split(',')
             .map((tag) => tag.trim())
             .filter(Boolean)

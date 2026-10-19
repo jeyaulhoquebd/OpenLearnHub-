@@ -1,9 +1,20 @@
 import { Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../lib/i18n';
+import { useAuth } from '../context/AuthContext';
 
 export default function LanguageSwitcher({ compact = false }) {
   const { i18n, t } = useTranslation();
+  const { user, updatePreferredLanguage } = useAuth();
+
+  async function handleChange(event) {
+    const next = event.target.value;
+    await i18n.changeLanguage(next);
+    if (user) {
+      // Persist the choice to the signed-in user's profile as well.
+      updatePreferredLanguage(next).catch(() => {});
+    }
+  }
 
   return (
     <label className="relative inline-flex items-center">
@@ -11,7 +22,7 @@ export default function LanguageSwitcher({ compact = false }) {
       <Globe className="pointer-events-none absolute start-3 h-4 w-4 text-ink-muted" aria-hidden="true" />
       <select
         value={i18n.language?.slice(0, 2) || 'en'}
-        onChange={(event) => i18n.changeLanguage(event.target.value)}
+        onChange={handleChange}
         className={`cursor-pointer appearance-none rounded-full border border-sand-300 bg-surface py-2 pe-8 ps-9 text-xs font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
           compact ? 'w-[4.5rem]' : ''
         }`}

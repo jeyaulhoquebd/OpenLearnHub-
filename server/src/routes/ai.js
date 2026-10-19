@@ -4,11 +4,17 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
 import { apiError } from '../lib/http.js';
+import { sanitizeText } from '../lib/validation.js';
 import { findRelevantResources, generateLearnMateReply } from '../lib/ai.js';
 
 const messageSchema = z.object({
   role: z.enum(['user', 'assistant']),
-  content: z.string().trim().min(1).max(2000)
+  content: z
+    .string()
+    .trim()
+    .min(1)
+    .max(2000)
+    .transform((value) => sanitizeText(value, { max: 2000, multiline: true }))
 });
 
 const chatSchema = z.object({

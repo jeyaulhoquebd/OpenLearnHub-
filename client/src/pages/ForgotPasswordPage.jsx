@@ -1,33 +1,40 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Loader2, Mail } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, CheckCircle2, Loader2, Mail } from 'lucide-react';
 import AuthShell from '../components/AuthShell';
 import FirebaseRequiredNotice from '../components/FirebaseRequiredNotice';
 import { useAuth } from '../context/AuthContext';
 import { authErrorKey } from '../lib/authErrors';
+import { forgotPasswordSchema } from '../lib/validation';
 import { usePageMeta } from '../hooks/usePageMeta';
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation();
   const { resetPassword, firebaseReady } = useAuth();
-  const [email, setEmail] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting }
+  } = useForm({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: '' }
+  });
+
   usePageMeta(t('auth.forgotTitle'));
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError('');
+  async function onSubmit(values) {
+    setFormError('');
     try {
-      await resetPassword(email.trim());
+      await resetPassword(values.email);
       setSent(true);
     } catch (authError) {
-      setError(t(authErrorKey(authError)));
-    } finally {
-      setSubmitting(false);
+      setFormError(t(authErrorKey(authError)));
     }
   }
 
@@ -53,7 +60,7 @@ export default function ForgotPasswordPage() {
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <div>
             <label className="label" htmlFor="forgot-email">
               {t('auth.email')}
@@ -63,24 +70,30 @@ export default function ForgotPasswordPage() {
               <input
                 id="forgot-email"
                 type="email"
-                required
                 autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
                 placeholder={t('auth.emailPlaceholder')}
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'forgot-email-error' : undefined}
                 className="input ps-11"
+                {...register('email')}
               />
             </div>
+            {errors.email && (
+              <p id="forgot-email-error" role="alert" className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-300">
+                {t(errors.email.message)}
+              </p>
+            )}
           </div>
 
-          {error && (
-            <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
-              {error}
+          {formError && (
+            <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {formError}
             </p>
           )}
 
-          <button type="submit" disabled={submitting} className="btn-primary w-full justify-center py-3">
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center py-3">
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {t('auth.sendReset')}
           </button>
         </form>

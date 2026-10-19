@@ -47,14 +47,14 @@ async function main() {
         uid: user.uid,
         email: user.email || email || null,
         displayName: user.displayName || null,
-        role: 'admin',
         updatedAt: FieldValue.serverTimestamp()
       },
       { merge: true }
     );
 
-  console.log(`[set-admin] ${user.email || user.uid} is now an admin.`);
-  console.log('[set-admin] Ask them to sign out and sign in again so the new token claim is applied.');
+  console.log(`[set-admin] ${user.email || user.uid} is now an admin (custom claim: admin=true).`);
+  console.log('[set-admin] The client reads this from getIdTokenResult(). Ask them to sign out and');
+  console.log('[set-admin] sign in again (or refresh their token) so the new claim is applied.');
   process.exit(0);
 }
 

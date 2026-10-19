@@ -44,3 +44,21 @@ export async function requireAuth(req, res, next) {
   req.user = user;
   return next();
 }
+
+/**
+ * Blocks signed-in users who have not verified their email from posting
+ * reviews or reports. Anonymous requests pass through (so anyone can still
+ * file a copyright notice) — only authenticated-but-unverified users are
+ * stopped.
+ */
+export function requireVerifiedEmail(req, res, next) {
+  if (req.user && req.user.email_verified !== true) {
+    return apiError(
+      res,
+      403,
+      'email_not_verified',
+      'Please verify your email address before posting.'
+    );
+  }
+  return next();
+}
