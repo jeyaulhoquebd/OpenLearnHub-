@@ -48,19 +48,25 @@ service cloud.firestore {
         request.resource.data.status == 'pending' &&
         request.resource.data.featured == false &&
         request.resource.data.type in ['course', 'book', 'software'] &&
-        isNonEmptyString(request.resource.data.title) &&
-        isNonEmptyString(request.resource.data.provider) &&
-        isNonEmptyString(request.resource.data.description) &&
+        // Refined per-language model: title/description are { en, bn?, ur? }.
+        request.resource.data.title is map &&
+        request.resource.data.title.en is string &&
+        request.resource.data.title.en.size() >= 3 &&
+        request.resource.data.title.en.size() <= 160 &&
+        request.resource.data.description is map &&
+        request.resource.data.description.en is string &&
+        request.resource.data.description.en.size() >= 40 &&
+        request.resource.data.description.en.size() <= 2000 &&
+        isNonEmptyString(request.resource.data.sourceName) &&
+        request.resource.data.sourceName.size() <= 160 &&
+        isNonEmptyString(request.resource.data.sourceUrl) &&
+        request.resource.data.sourceUrl.matches('^https://.*') &&
         isNonEmptyString(request.resource.data.license) &&
-        isNonEmptyString(request.resource.data.url) &&
-        request.resource.data.url.matches('^https://.*') &&
-        request.resource.data.languages is list &&
-        request.resource.data.languages.size() > 0 &&
+        request.resource.data.license.size() <= 160 &&
+        request.resource.data.language is list &&
+        request.resource.data.language.size() > 0 &&
         request.resource.data.countries is list &&
         request.resource.data.countries.size() > 0 &&
-        request.resource.data.description.size() <= 2000 &&
-        request.resource.data.title.size() <= 160 &&
-        request.resource.data.provider.size() <= 160 &&
         (!('licenseUrl' in request.resource.data) ||
           request.resource.data.licenseUrl == null ||
           request.resource.data.licenseUrl.matches('^https://.*')) &&
@@ -165,6 +171,14 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if false;
       allow update, delete: if isAdmin();
+    }
+
+    // ---------- server-only settings ----------
+    // The Gemini API key and model live in settings/ai and are written by the
+    // Express API with the Admin SDK (which bypasses these rules). Clients can
+    // never read or write anything under settings/.
+    match /settings/{documentId} {
+      allow read, write: if false;
     }
 
     // ---------- default deny ----------

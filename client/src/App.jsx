@@ -10,6 +10,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import HomePage from './pages/HomePage';
 
 const ExplorePage = lazy(() => import('./pages/ExplorePage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
 const SubmitResourcePage = lazy(() => import('./pages/SubmitResourcePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -42,9 +44,11 @@ export default function App() {
                   <Route path="courses" element={withSuspense(<ExplorePage fixedType="course" />)} />
                   <Route path="books" element={withSuspense(<ExplorePage fixedType="book" />)} />
                   <Route path="software" element={withSuspense(<ExplorePage fixedType="software" />)} />
+                  <Route path="search" element={withSuspense(<SearchPage />)} />
                   <Route path="resource/:id" element={withSuspense(<ResourceDetailPage />)} />
                   <Route path="assistant" element={withSuspense(<AssistantPage />)} />
                   <Route path="about" element={withSuspense(<AboutPage />)} />
+                  <Route path="contact" element={withSuspense(<ContactPage />)} />
                   <Route path="login" element={withSuspense(<LoginPage />)} />
                   <Route path="signup" element={withSuspense(<SignupPage />)} />
                   <Route path="forgot-password" element={withSuspense(<ForgotPasswordPage />)} />

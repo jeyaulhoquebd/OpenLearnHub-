@@ -32,10 +32,14 @@ OpenLearn Hub lists free courses, lawfully available books (open textbooks, publ
 
 ## What it does
 
-- **Browse and filter** 35 hand-checked resources by type, subject, level, language, region, platform, and search terms.
-- **Detail pages** with provider, licence, last-verified date, official link, related resources, sharing, and a report button.
-- **Accounts** with email/password and Google sign-in (Firebase Auth).
-- **Saved resources** and a personal dashboard of your submissions.
+- **Browse and filter** 35 hand-checked resources by type, subject, level, language, region, platform, minimum rating, and search terms — with sorting and pagination.
+- **Dedicated search page** (`/search`) that spans courses, books, and software with per-type result counts.
+- **Detail pages** with provider, licence, last-verified date, official link, rating summary, related resources, sharing, "open official link", and a report button.
+- **Ratings and reviews** from signed-in, email-verified learners (one review per resource, editable).
+- **Progress tracking** (Not started / In progress / Completed) per resource.
+- **Free Alternatives to Paid Software** on the home page (Photoshop → GIMP, MS Office → LibreOffice, and more).
+- **Accounts** with email/password, Google, GitHub, and Apple sign-in (Firebase Auth).
+- **Personal dashboard** with saved resources, progress, review history, submissions, and account settings.
 - **Community submissions** that enter a moderation queue (`status: "pending"`).
 - **Admin dashboard** for approving/rejecting submissions and resolving reports.
 - **Report this resource** on every card and detail page for copyright, piracy, broken-link, and accuracy issues.
@@ -83,7 +87,7 @@ The preview server runs at `http://localhost:4173`. In preview mode the AI assis
 | Auth / data | Firebase Web SDK v11 (Auth, Firestore, Storage) |
 | Backend | Node.js 20+, Express 4, firebase-admin, zod, helmet, express-rate-limit |
 | Hosting | Firebase Hosting (frontend); Render / Railway / Cloud Run (API) |
-| AI | Any OpenAI-compatible chat-completions endpoint, called server-side |
+| AI | Google Gemini via the official `@google/genai` SDK, called server-side only |
 
 There are **no Cloud Functions**. The API is a normal Express service so it can run on free/cheap containers and be deployed independently.
 
@@ -97,7 +101,7 @@ There are **no Cloud Functions**. The API is a normal Express service so it can 
 │   │   ├── context/        Auth and toast providers
 │   │   ├── hooks/          useResources, usePageMeta
 │   │   ├── lib/            Firebase init, data layer, API client, i18n
-│   │   ├── locales/        en / bn / hi / ur translation files
+│   │   ├── locales/        en / bn / ur translation files
 │   │   └── pages/          Route-level pages (lazy loaded)
 │   ├── public/             favicon, OG image, robots.txt
 │   ├── .env.example
@@ -315,15 +319,15 @@ Leaving the six required Firebase values empty is supported and enables preview 
 {
   "id": "python",
   "type": "course | book | software",
-  "title": "Python",
+  "title": { "en": "Python", "bn": "…", "ur": "…" },
   "slug": "python",
-  "provider": "Python Software Foundation",
-  "description": "Short summary",
-  "longDescription": "Longer summary",
-  "url": "https://official-source.example/...",
+  "sourceName": "Python Software Foundation",
+  "description": { "en": "Short summary", "bn": "…", "ur": "…" },
+  "longDescription": { "en": "Longer summary" },
+  "sourceUrl": "https://official-source.example/...",
   "category": "Development Tools",
   "level": "All levels",
-  "languages": ["English"],
+  "language": ["English"],
   "countries": ["Bangladesh", "India", "Pakistan"],
   "platform": ["Windows", "macOS", "Linux"],
   "tags": ["python", "programming"],
@@ -332,7 +336,11 @@ Leaving the six required Firebase values empty is supported and enables preview 
   "author": null,
   "featured": true,
   "thumbnailUrl": null,
-  "status": "published | pending | rejected",
+  "ratingAvg": 4.6,
+  "ratingCount": 128,
+  "viewCount": 5120,
+  "saveCount": 340,
+  "status": "published | draft | flagged",
   "createdBy": "<uid, for community submissions>",
   "creatorEmail": "<email>",
   "lastVerified": "2026-10-01T00:00:00.000Z",
@@ -341,6 +349,14 @@ Leaving the six required Firebase values empty is supported and enables preview 
   "updatedAt": "<timestamp>"
 }
 ```
+
+`title` and `description` are stored as `{ en, bn, ur }` maps; the client
+resolves them for the active language with `localized()` and falls back to
+English. The seed script (`server/scripts/seed.js`) wraps the English source
+text into these maps, and will merge in `firebase/seed/translations.json` when
+it exists. The client also tolerates the older flat shape (`title` as a string,
+`provider`, `url`, `languages`, `status: "pending" | "rejected"`), so existing
+data keeps rendering during the migration.
 
 ### `users/{uid}` and `users/{uid}/bookmarks/{resourceId}`
 
@@ -353,10 +369,17 @@ Leaving the six required Firebase values empty is supported and enables preview 
 
 | Collection | Read | Write |
 | --- | --- | --- |
-| `categories/{id}`, `alternatives/{id}` | public | admins only |
-| `bookmarks/{userId_resourceId}`, `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
+| `categories/{id}` | public | admins only |
+| `alternatives/{id}` | public | admins only |
+| `bookmarks/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
+| `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
 | `reviews/{resourceId_userId}` | public | verified, signed-in owner (one review per resource) |
 | `reports/{id}` | admins | **created by the Express API only** |
+| `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
+
+`categories` seed data lives in `firebase/seed/categories.json` and
+`alternatives` (the "free alternatives to paid software" pairs) in
+`firebase/seed/alternatives.json`. Both are written by `npm run seed`.
 
 ### `reports/{reportId}`
 
@@ -368,11 +391,13 @@ Leaving the six required Firebase values empty is supported and enables preview 
 
 - Published resources: public read.
 - Pending/rejected resources: visible to the submitter and admins only.
-- Resource create: signed-in user, `status: "pending"`, `featured: false`, HTTPS URL, required fields, length limits.
+- Resource create: signed-in user, `status: "pending"`, `featured: false`, `title`/`description` maps with an English value, HTTPS `sourceUrl`, required fields, length limits.
 - Resource update/delete, categories, alternatives: admins only.
 - Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
+- Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`.
 - Reviews: verified email required, one per resource, owner-only edits.
-- Storage: images under 2 MB, thumbnail paths only.
+- `settings/*`: completely denied to clients (the server's Admin SDK writes it).
+- Storage: images under 2 MB, thumbnail paths only; admins may write anywhere.
 - Default deny for everything else.
 
 ## API

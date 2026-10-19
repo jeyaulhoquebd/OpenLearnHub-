@@ -31,8 +31,9 @@ export default function Footer() {
       title: t('footer.company'),
       links: [
         { to: '/about', label: t('footer.about') },
-        { to: '/explore?category=Digital%20Skills', label: t('footer.courses') },
-        { to: '/explore?category=School%20%26%20College', label: t('type.books') }
+        { to: '/contact', label: t('footer.contact') },
+        { to: '/search', label: t('footer.search') },
+        { to: '/submit', label: t('footer.submit') }
       ]
     },
     {

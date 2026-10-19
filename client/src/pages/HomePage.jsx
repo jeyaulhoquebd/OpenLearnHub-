@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -24,7 +24,8 @@ import { ResourceGridSkeleton } from '../components/LoadingStates';
 import { useResources } from '../hooks/useResources';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { COUNTRY_FLAGS, TYPE_META } from '../lib/constants';
-import { getRelatedResources } from '../lib/data';
+import { fetchAlternatives, getAlternativesWithResources, getRelatedResources } from '../lib/data';
+import { localized } from '../lib/utils';
 
 const CATEGORY_CARDS = [
   { name: 'Computer Science', icon: Code2, color: 'bg-brand-50 text-brand-700 ring-brand-100' },
@@ -38,11 +39,29 @@ const CATEGORY_CARDS = [
 ];
 
 export default function HomePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { resources, loading } = useResources();
   const [search, setSearch] = useState('');
+  const [alternatives, setAlternatives] = useState([]);
   usePageMeta(null, t('home.description'));
+
+  useEffect(() => {
+    let active = true;
+    fetchAlternatives()
+      .then((items) => {
+        if (active) setAlternatives(items);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const alternativesWithResources = useMemo(
+    () => getAlternativesWithResources(alternatives, resources).slice(0, 6),
+    [alternatives, resources]
+  );
 
   const featured = useMemo(() => resources.filter((resource) => resource.featured).slice(0, 6), [resources]);
   const heroCourses = useMemo(() => resources.filter((item) => item.type === 'course').slice(0, 1), [resources]);
@@ -199,7 +218,7 @@ export default function HomePage() {
                       {t(TYPE_META[featuredCourse.type].labelKey)}
                     </p>
                     <p className="mt-0.5 line-clamp-2 text-xs font-bold leading-snug text-ink">
-                      {featuredCourse.title}
+                      {localized(featuredCourse.title, i18n.language)}
                     </p>
                   </div>
                 </Link>
@@ -219,7 +238,7 @@ export default function HomePage() {
                         {t('type.book')}
                       </p>
                       <p className="mt-0.5 line-clamp-2 text-xs font-bold leading-snug text-ink">
-                        {featuredBook.title}
+                        {localized(featuredBook.title, i18n.language)}
                       </p>
                     </div>
                   </div>
@@ -241,7 +260,9 @@ export default function HomePage() {
                     <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300">
                       {t('type.software')}
                     </p>
-                    <p className="mt-0.5 line-clamp-1 text-xs font-bold text-ink">{featuredSoftware.title}</p>
+                    <p className="mt-0.5 line-clamp-1 text-xs font-bold text-ink">
+                      {localized(featuredSoftware.title, i18n.language)}
+                    </p>
                     <p className="mt-0.5 text-[10px] text-ink-muted">{t('resource.officialDownload')}</p>
                   </div>
                 </Link>
@@ -360,13 +381,70 @@ export default function HomePage() {
                   to={`/resource/${resource.id}`}
                   className="rounded-full border border-sand-200 bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink-soft transition hover:border-brand-300 hover:text-brand-800"
                 >
-                  {resource.title}
+                  {localized(resource.title, i18n.language)}
                 </Link>
               ))}
             </div>
           )}
         </div>
       </section>
+
+      {alternativesWithResources.length > 0 && (
+        <section className="section">
+          <div className="container-page">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="eyebrow">
+                  <span className="h-px w-7 bg-accent-400" />
+                  {t('home.alternativesEyebrow')}
+                </p>
+                <h2 className="display-title mt-3">{t('home.alternativesTitle')}</h2>
+                <p className="mt-3 text-sm leading-relaxed text-ink-soft sm:text-base">
+                  {t('home.alternativesSubtitle')}
+                </p>
+              </div>
+              <Link to="/software" className="btn-secondary shrink-0">
+                {t('common.browseAll')}
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <ul className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {alternativesWithResources.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-sand-200 bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg bg-sand-100 px-2.5 py-1 text-[11px] font-semibold text-ink-muted line-through dark:bg-white/10">
+                      {item.paidSoftware}
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                  </div>
+
+                  <Link
+                    to={`/resource/${item.freeResource.id}`}
+                    className="group flex items-start gap-3"
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-200">
+                      <Sparkles className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-ink group-hover:text-brand-800">
+                        {localized(item.freeResource.title, i18n.language)}
+                      </span>
+                      <span className="mt-0.5 block text-xs leading-relaxed text-ink-soft">
+                        {localized(item.note, i18n.language)}
+                      </span>
+                    </span>
+                    <ArrowUpRight className="h-4 w-4 shrink-0 text-ink-muted transition group-hover:text-brand-700" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="container-page">

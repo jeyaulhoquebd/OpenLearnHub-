@@ -6,20 +6,24 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
     match /thumbnails/{userId}/{fileName} {
       // Thumbnails are public so resource cards can render them.
       allow read: if true;
 
       // A signed-in user may upload only into their own folder, only image
-      // files, and only up to 2 MB.
+      // files, and only up to 2 MB. Admins may upload anywhere.
       allow create, update: if
         request.auth != null &&
-        request.auth.uid == userId &&
+        (request.auth.uid == userId || isAdmin()) &&
         request.resource.size < 2 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
 
-      // Only the owner (or Firebase Admin via the server) may delete.
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      // Only the owner or an admin (Firebase Admin via the server) may delete.
+      allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
     // Everything else is denied.

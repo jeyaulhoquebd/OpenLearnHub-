@@ -1,0 +1,112 @@
+[
+  {
+    "id": "photoshop-to-gimp",
+    "paidSoftware": "Adobe Photoshop",
+    "freeAlternativeResourceId": "gimp",
+    "order": 1,
+    "note": {
+      "en": "Photo editing, retouching, and image compositing.",
+      "bn": "ছবি সম্পাদনা, রিটাচিং এবং কম্পোজিটিং।",
+      "ur": "تصویر کی تدوین، ری ٹچنگ اور کمپوزنگ۔"
+    }
+  },
+  {
+    "id": "office-to-libreoffice",
+    "paidSoftware": "Microsoft Office",
+    "freeAlternativeResourceId": "libreoffice",
+    "order": 2,
+    "note": {
+      "en": "Documents, spreadsheets, and presentations.",
+      "bn": "ডকুমেন্ট, স্প্রেডশিট এবং প্রেজেন্টেশন।",
+      "ur": "دستاویزات، اسپریڈشیٹس اور پریزنٹیشنز۔"
+    }
+  },
+  {
+    "id": "illustrator-to-inkscape",
+    "paidSoftware": "Adobe Illustrator",
+    "freeAlternativeResourceId": "inkscape",
+    "order": 3,
+    "note": {
+      "en": "Vector graphics, logos, and print design.",
+      "bn": "ভেক্টর গ্রাফিক্স, লোগো এবং প্রিন্ট ডিজাইন।",
+      "ur": "ویکٹر گرافکس، لوگو اور پرنٹ ڈیزائن۔"
+    }
+  },
+  {
+    "id": "premiere-to-blender",
+    "paidSoftware": "Adobe Premiere Pro",
+    "freeAlternativeResourceId": "blender",
+    "order": 4,
+    "note": {
+      "en": "Video editing, motion graphics, and 3D.",
+      "bn": "ভিডিও এডিটিং, মোশন গ্রাফিক্স এবং থ্রিডি।",
+      "ur": "ویڈیو ایڈیٹنگ، موشن گرافکس اور تھری ڈی۔"
+    }
+  },
+  {
+    "id": "aftereffects-to-blender",
+    "paidSoftware": "Adobe After Effects",
+    "freeAlternativeResourceId": "blender",
+    "order": 5,
+    "note": {
+      "en": "Compositing, animation, and visual effects.",
+      "bn": "কম্পোজিটিং, অ্যানিমেশন এবং ভিজ্যুয়াল ইফেক্ট।",
+      "ur": "کمپوزنگ، اینیمیشن اور بصری اثرات۔"
+    }
+  },
+  {
+    "id": "audition-to-audacity",
+    "paidSoftware": "Adobe Audition",
+    "freeAlternativeResourceId": "audacity",
+    "order": 6,
+    "note": {
+      "en": "Podcast and audio recording, cleanup, and mixing.",
+      "bn": "পডকাস্ট ও অডিও রেকর্ডিং, পরিষ্কার এবং মিক্সিং।",
+      "ur": "پوڈکاسٹ اور آڈیو ریکارڈنگ، صفائی اور مکسنگ۔"
+    }
+  },
+  {
+    "id": "camtasia-to-obs",
+    "paidSoftware": "Camtasia",
+    "freeAlternativeResourceId": "obs-studio",
+    "order": 7,
+    "note": {
+      "en": "Screen recording for lessons and tutorials.",
+      "bn": "পাঠ ও টিউটোরিয়ালের জন্য স্ক্রিন রেকর্ডিং।",
+      "ur": "اسباق اور ٹیوٹوریلز کے لیے اسکرین ریکارڈنگ۔"
+    }
+  },
+  {
+    "id": "paid-editor-to-vscode",
+    "paidSoftware": "Sublime Text / paid code editors",
+    "freeAlternativeResourceId": "visual-studio-code",
+    "order": 8,
+    "note": {
+      "en": "Writing code across many languages and platforms.",
+      "bn": "অনেক ভাষা ও প্ল্যাটফর্মে কোড লেখা।",
+      "ur": "کئی زبانوں اور پلیٹ فارمز پر کوڈ لکھنا۔"
+    }
+  },
+  {
+    "id": "corel-painter-to-krita",
+    "paidSoftware": "Corel Painter / Adobe Fresco",
+    "freeAlternativeResourceId": "krita",
+    "order": 9,
+    "note": {
+      "en": "Digital painting, illustration, and comics.",
+      "bn": "ডিজিটাল পেইন্টিং, ইলাস্ট্রেশন এবং কমিক।",
+      "ur": "ڈیجیٹل پینٹنگ، عکاسی اور کامکس۔"
+    }
+  },
+  {
+    "id": "paid-media-player-to-vlc",
+    "paidSoftware": "Paid media players",
+    "freeAlternativeResourceId": "vlc",
+    "order": 10,
+    "note": {
+      "en": "Playing almost any video or audio format.",
+      "bn": "প্রায় যেকোনো ভিডিও বা অডিও ফরম্যাট চালানো।",
+      "ur": "تقریباً ہر ویڈیو یا آڈیو فارمیٹ چلانا۔"
+    }
+  }
+]

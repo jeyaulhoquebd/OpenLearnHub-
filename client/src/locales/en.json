@@ -109,7 +109,10 @@
     "ctaButton": "Submit a resource",
     "browseLibrary": "Browse the library",
     "sourcesTitle": "Sources we trust",
-    "moreToExplore": "More to explore"
+    "moreToExplore": "More to explore",
+    "alternativesEyebrow": "Switch, don't pay",
+    "alternativesTitle": "Free alternatives to paid software.",
+    "alternativesSubtitle": "Same job, no licence fee. Every alternative below is open source and links straight to the official download."
   },
   "explore": {
     "eyebrow": "The library",
@@ -139,7 +142,11 @@
     "errorTitle": "We couldn't load the library",
     "errorText": "Check your connection and try again.",
     "resultsTitle": "Resources",
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "rating": "Rating",
+    "pagination": "Pagination",
+    "previous": "Previous",
+    "next": "Next"
   },
   "filters": {
     "allCategories": "All subjects",
@@ -147,8 +154,13 @@
     "allLanguages": "All languages",
     "allCountries": "All regions",
     "allPlatforms": "All platforms",
+    "allRatings": "Any rating",
+    "rating4": "4 stars & up",
+    "rating3": "3 stars & up",
     "sortRecommended": "Recommended",
     "sortNewest": "Newest first",
+    "sortRating": "Highest rated",
+    "sortPopular": "Most popular",
     "sortAZ": "A–Z"
   },
   "resource": {
@@ -191,7 +203,70 @@
     "legalOfficial": "Legal & official source",
     "viewLicense": "View licence",
     "communitySubmission": "Community submission",
-    "officialDownload": "Official download"
+    "officialDownload": "Official download",
+    "views": "{{count}} views",
+    "saves": "{{count}} saved"
+  },
+  "reviews": {
+    "title": "Ratings & reviews",
+    "subtitle": "Real experiences from other learners help everyone choose well.",
+    "write": "Write a review",
+    "editMine": "Edit your review",
+    "count": "{{count}} reviews",
+    "summarySr": "{{count}} reviews in total",
+    "empty": "No reviews yet. Be the first to share what you think.",
+    "signInToReview": "Sign in to rate this resource and leave a review.",
+    "verifyToReview": "Reviews are open to accounts with a verified email address. Verify your email to post yours.",
+    "ratingLabel": "Your rating",
+    "bodyLabel": "Your review",
+    "bodyPlaceholder": "What did you think? Was it beginner-friendly? Would you recommend it?",
+    "submit": "Post review",
+    "posted": "Review posted. Thank you!",
+    "updated": "Review updated.",
+    "deleted": "Review deleted.",
+    "delete": "Delete review",
+    "confirmDelete": "Delete your review of this resource?",
+    "error": "We couldn't save your review. Please try again.",
+    "anonymous": "Learner",
+    "you": "You"
+  },
+  "progress": {
+    "title": "Your progress",
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "completed": "Completed",
+    "saved": "Progress saved.",
+    "error": "We couldn't save your progress.",
+    "signInHint": "Sign in to track your progress and pick up where you left off."
+  },
+  "search": {
+    "title": "Search the library",
+    "subtitle": "Courses, books, and open-source software — all free, all legal, in one place.",
+    "placeholder": "Search free courses, books, software…",
+    "resultsFor": "{{count}} results for “{{query}}”",
+    "emptyTitle": "No matches found",
+    "emptyText": "Try a shorter phrase, a different spelling, or browse the library instead.",
+    "emptyPromptTitle": "What do you want to learn?",
+    "emptyPromptText": "Search across every free course, book, and open-source tool in the library.",
+    "browseInstead": "Browse the library"
+  },
+  "contact": {
+    "eyebrow": "Get in touch",
+    "title": "We would love to hear from you.",
+    "subtitle": "Corrections, new resource suggestions, partnerships, or a bug — pick the right channel and we'll get back to you.",
+    "generalTitle": "General enquiries",
+    "generalText": "Questions about the library, partnerships, or anything that isn't a legal matter.",
+    "generalButton": "Email us",
+    "legalTitle": "Copyright & legal",
+    "legalText": "Copyright notices, takedown requests, or concerns about a listing's legality.",
+    "legalButton": "Contact legal",
+    "reportTitle": "Found a broken or illegal link?",
+    "reportText": "Every resource has a report button. Tell us what's wrong and our moderators will review it.",
+    "reportButton": "Go to the library",
+    "submitTitle": "Suggest a resource",
+    "submitText": "Know a free, legal course, book, or open-source tool we should add?",
+    "submitButton": "Submit a resource",
+    "responseNote": "We are a small volunteer team. We aim to reply within a few working days, and we action genuine copyright notices as a priority."
   },
   "auth": {
     "loginTitle": "Welcome back.",
@@ -370,7 +445,14 @@
     "adminText": "Review community submissions and reports.",
     "openAdmin": "Open admin",
     "savedCount": "{{count}} saved",
-    "submissionCount": "{{count}} submitted"
+    "submissionCount": "{{count}} submitted",
+    "inProgress": "In progress",
+    "reviews": "My reviews",
+    "continueLearning": "Continue",
+    "emptyProgressTitle": "No progress tracked yet",
+    "emptyProgressText": "Mark a resource as in progress or completed and it will show up here.",
+    "emptyReviewsTitle": "You haven't written any reviews",
+    "emptyReviewsText": "Share what you thought of a resource to help other learners."
   },
   "admin": {
     "eyebrow": "Moderation",
@@ -524,7 +606,9 @@
     "madeFor": "Made for learners in Bangladesh, India, and Pakistan.",
     "disclaimer": "OpenLearn Hub links to third-party resources and does not host files.",
     "rights": "© {{year}} OpenLearn Hub. All rights reserved.",
-    "language": "Language"
+    "language": "Language",
+    "contact": "Contact",
+    "search": "Search"
   },
   "notFound": {
     "title": "This page wandered off.",

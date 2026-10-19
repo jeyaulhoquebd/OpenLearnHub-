@@ -20,11 +20,13 @@ import {
   COUNTRIES,
   LANGUAGES,
   LEVELS,
+  PAGE_SIZE,
   PLATFORMS,
+  RATING_OPTIONS,
   SORT_OPTIONS,
   TYPE_META
 } from '../lib/constants';
-import { filterResources } from '../lib/data';
+import { filterResources, paginate } from '../lib/data';
 
 function FilterSelect({ label, value, onChange, children }) {
   return (
@@ -47,7 +49,7 @@ function FilterSelect({ label, value, onChange, children }) {
 }
 
 export default function ExplorePage({ fixedType = null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { resources, loading, error, reload } = useResources();
   const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -60,8 +62,11 @@ export default function ExplorePage({ fixedType = null }) {
     language: params.get('language') || 'all',
     country: params.get('country') || 'all',
     platform: params.get('platform') || 'all',
-    sort: params.get('sort') || 'recommended'
+    rating: params.get('rating') || 'all',
+    sort: params.get('sort') || 'recommended',
+    uiLanguage: i18n.language
   };
+  const page = Number(params.get('page')) || 1;
 
   const meta = fixedType ? TYPE_META[fixedType] : null;
   const title = fixedType
@@ -81,9 +86,13 @@ export default function ExplorePage({ fixedType = null }) {
 
   usePageMeta(title, subtitle);
 
-  const filtered = useMemo(() => filterResources(resources, filters), [resources, params, fixedType]);
+  const filtered = useMemo(
+    () => filterResources(resources, filters),
+    [resources, params, fixedType, i18n.language]
+  );
+  const paged = useMemo(() => paginate(filtered, page, PAGE_SIZE), [filtered, page]);
 
-  const activeFilterCount = ['category', 'level', 'language', 'country', 'platform'].filter(
+  const activeFilterCount = ['category', 'level', 'language', 'country', 'platform', 'rating'].filter(
     (key) => params.get(key) && params.get(key) !== 'all'
   ).length;
 
@@ -94,7 +103,16 @@ export default function ExplorePage({ fixedType = null }) {
     } else {
       next.set(key, value);
     }
+    next.delete('page');
     setParams(next, { replace: true });
+  }
+
+  function goToPage(target) {
+    const next = new URLSearchParams(params);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    setParams(next, { replace: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function clearFilters() {
@@ -241,6 +259,15 @@ export default function ExplorePage({ fixedType = null }) {
                   ))}
                 </FilterSelect>
 
+                <FilterSelect label={t('explore.rating')} value={filters.rating} onChange={(value) => setFilter('rating', value)}>
+                  <option value="all">{t('filters.allRatings')}</option>
+                  {RATING_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {t(option.labelKey)}
+                    </option>
+                  ))}
+                </FilterSelect>
+
                 {(!fixedType || fixedType === 'software') && (
                   <FilterSelect label={t('explore.platform')} value={filters.platform} onChange={(value) => setFilter('platform', value)}>
                     <option value="all">{t('filters.allPlatforms')}</option>
@@ -359,12 +386,51 @@ export default function ExplorePage({ fixedType = null }) {
                 />
               ) : (
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {filtered.map((resource) => (
+                  {paged.items.map((resource) => (
                     <ResourceCard key={resource.id} resource={resource} />
                   ))}
                 </div>
               )}
             </div>
+
+            {!loading && !error && paged.pageCount > 1 && (
+              <nav
+                className="mt-9 flex items-center justify-center gap-1.5"
+                aria-label={t('explore.pagination')}
+              >
+                <button
+                  type="button"
+                  onClick={() => goToPage(paged.page - 1)}
+                  disabled={paged.page <= 1}
+                  className="btn-secondary btn-sm disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {t('explore.previous')}
+                </button>
+                {Array.from({ length: paged.pageCount }, (_, index) => index + 1).map((number) => (
+                  <button
+                    key={number}
+                    type="button"
+                    onClick={() => goToPage(number)}
+                    aria-current={number === paged.page ? 'page' : undefined}
+                    className={`grid h-9 min-w-9 place-items-center rounded-full px-3 text-sm font-semibold transition ${
+                      number === paged.page
+                        ? 'bg-navy-900 text-white'
+                        : 'border border-sand-300 bg-surface text-ink-soft hover:border-brand-300 hover:text-brand-800'
+                    }`}
+                  >
+                    {number}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => goToPage(paged.page + 1)}
+                  disabled={paged.page >= paged.pageCount}
+                  className="btn-secondary btn-sm disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {t('explore.next')}
+                </button>
+              </nav>
+            )}
           </div>
         </div>
       </section>

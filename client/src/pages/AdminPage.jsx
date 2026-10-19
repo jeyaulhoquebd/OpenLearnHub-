@@ -28,7 +28,7 @@ import {
 } from '../lib/data';
 import { invalidateResourceCache } from '../lib/resourceCache';
 import { REPORT_REASONS, TYPE_META } from '../lib/constants';
-import { formatDate } from '../lib/utils';
+import { formatDate, localized } from '../lib/utils';
 
 export default function AdminPage() {
   const { t, i18n } = useTranslation();
@@ -222,11 +222,15 @@ export default function AdminPage() {
                               {t('dashboard.statusPending')}
                             </span>
                           </div>
-                          <h2 className="mt-3 font-display text-xl font-semibold text-ink">{resource.title}</h2>
+                          <h2 className="mt-3 font-display text-xl font-semibold text-ink">
+                            {localized(resource.title, i18n.language)}
+                          </h2>
                           <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                            {resource.provider} · {resource.category} · {resource.level}
+                            {resource.sourceName} · {resource.category} · {resource.level}
                           </p>
-                          <p className="mt-3 text-sm leading-relaxed text-ink-soft">{resource.description}</p>
+                          <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+                            {localized(resource.description, i18n.language)}
+                          </p>
 
                           <div className="mt-4 grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
                             <p className="flex items-center gap-1.5">
@@ -244,13 +248,13 @@ export default function AdminPage() {
                           </div>
 
                           <a
-                            href={resource.url}
+                            href={resource.sourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-3 inline-flex max-w-full items-center gap-1.5 truncate text-xs font-semibold text-brand-700 underline underline-offset-2"
                           >
                             <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{resource.url}</span>
+                            <span className="truncate">{resource.sourceUrl}</span>
                           </a>
                         </div>
 

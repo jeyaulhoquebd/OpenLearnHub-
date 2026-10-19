@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Menu, Plus, Sparkles, X } from 'lucide-react';
+import { Menu, Plus, Search, Sparkles, X } from 'lucide-react';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeToggle from './ThemeToggle';
@@ -68,6 +68,14 @@ export default function Header() {
         </nav>
 
         <div className="hidden items-center gap-2.5 xl:flex">
+          <Link
+            to="/search"
+            className="grid h-10 w-10 place-items-center rounded-full border border-sand-300 bg-surface text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800"
+            aria-label={t('common.search')}
+            title={t('common.search')}
+          >
+            <Search className="h-4 w-4" />
+          </Link>
           <ThemeToggle />
           <LanguageSwitcher />
           {user ? (
@@ -92,6 +100,14 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2 xl:hidden">
+          <Link
+            to="/search"
+            className="grid h-10 w-10 place-items-center rounded-full border border-sand-300 bg-surface text-ink-soft shadow-sm"
+            aria-label={t('common.search')}
+            title={t('common.search')}
+          >
+            <Search className="h-4 w-4" />
+          </Link>
           <ThemeToggle />
           <div className="hidden sm:block">
             <LanguageSwitcher compact />

@@ -6,12 +6,15 @@ import { TYPE_META } from '../lib/constants';
 import ResourceVisual from './ResourceVisual';
 import BookmarkButton from './BookmarkButton';
 import ReportModal from './ReportModal';
-import { truncate } from '../lib/utils';
+import StarRating from './StarRating';
+import { localized, truncate } from '../lib/utils';
 
 export default function ResourceCard({ resource, compact = false }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [reportOpen, setReportOpen] = useState(false);
   const meta = TYPE_META[resource.type] || TYPE_META.course;
+  const title = localized(resource.title, i18n.language);
+  const description = localized(resource.description, i18n.language);
 
   return (
     <>
@@ -34,20 +37,25 @@ export default function ResourceCard({ resource, compact = false }) {
                 {t('common.verified')}
               </span>
             )}
+            {resource.ratingCount > 0 && (
+              <span className="ms-auto">
+                <StarRating value={resource.ratingAvg} count={resource.ratingCount} size="sm" />
+              </span>
+            )}
           </div>
 
           <p className="mt-3 line-clamp-1 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-muted">
-            {resource.provider}
+            {resource.sourceName}
           </p>
 
           <h3 className="mt-1.5 font-display text-lg font-semibold leading-snug text-ink">
             <Link to={`/resource/${resource.id}`} className="transition hover:text-brand-800">
-              {resource.title}
+              {title}
             </Link>
           </h3>
 
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            {truncate(resource.description, compact ? 100 : 145)}
+            {truncate(description, compact ? 100 : 145)}
           </p>
 
           {!compact && resource.tags?.length > 0 && (
@@ -66,7 +74,7 @@ export default function ResourceCard({ resource, compact = false }) {
               className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 transition hover:text-brand-950"
             >
               {t('common.learnMore')}
-              <span className="sr-only">: {resource.title}</span>
+              <span className="sr-only">: {title}</span>
               <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </Link>
             <div className="flex items-center gap-1.5">

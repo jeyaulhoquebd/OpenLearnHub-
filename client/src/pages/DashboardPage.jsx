@@ -9,24 +9,33 @@ import {
   Globe,
   LayoutDashboard,
   Loader2,
+  MessageSquare,
   Plus,
   ShieldCheck,
   Sparkles,
   Trash2,
+  TrendingUp,
   UploadCloud,
   UserRound,
   XCircle
 } from 'lucide-react';
 import ResourceCard from '../components/ResourceCard';
+import StarRating from '../components/StarRating';
 import EmptyState from '../components/EmptyState';
 import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import { ResourceGridSkeleton } from '../components/LoadingStates';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { fetchBookmarks, fetchUserSubmissions } from '../lib/data';
+import { useResources } from '../hooks/useResources';
+import {
+  fetchBookmarks,
+  fetchProgress,
+  fetchUserReviews,
+  fetchUserSubmissions
+} from '../lib/data';
 import { SUPPORTED_LANGUAGES } from '../lib/i18n';
-import { formatDate, initials } from '../lib/utils';
+import { formatDate, initials, localized } from '../lib/utils';
 
 const STATUS_META = {
   pending: { icon: Clock3, className: 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30', key: 'dashboard.statusPending' },
@@ -34,35 +43,66 @@ const STATUS_META = {
   rejected: { icon: XCircle, className: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30', key: 'dashboard.statusRejected' }
 };
 
+const PROGRESS_LABELS = {
+  not_started: { icon: Clock3, className: 'bg-sand-100 text-ink-soft ring-sand-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/15', key: 'progress.notStarted' },
+  in_progress: { icon: TrendingUp, className: 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30', key: 'progress.inProgress' },
+  completed: { icon: CheckCircle2, className: 'bg-brand-50 text-brand-800 ring-brand-200', key: 'progress.completed' }
+};
+
 export default function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user, profile, isAdmin, isVerified, provider, deleteAccount, updatePreferredLanguage } = useAuth();
   const { push } = useToast();
+  const { resources } = useResources();
   const [params, setParams] = useSearchParams();
   const activeTab = params.get('tab') || 'saved';
   const [bookmarks, setBookmarks] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [progress, setProgress] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   usePageMeta(t('dashboard.title', { name: profile?.displayName || user?.displayName || '' }));
 
   const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Learner';
 
+  const resourceById = useMemo(() => {
+    const map = new Map(resources.map((resource) => [resource.id, resource]));
+    return map;
+  }, [resources]);
+
+  const progressItems = useMemo(
+    () =>
+      progress
+        .map((entry) => ({ ...entry, resource: resourceById.get(entry.resourceId) }))
+        .filter((entry) => entry.resource),
+    [progress, resourceById]
+  );
+
   useEffect(() => {
     let active = true;
     if (!user) return undefined;
     setLoading(true);
-    Promise.all([fetchBookmarks(user.uid), fetchUserSubmissions(user.uid)])
-      .then(([saved, submitted]) => {
+    Promise.all([
+      fetchBookmarks(user.uid),
+      fetchUserSubmissions(user.uid),
+      fetchProgress(user.uid),
+      fetchUserReviews(user.uid)
+    ])
+      .then(([saved, submitted, tracked, mine]) => {
         if (!active) return;
         setBookmarks(saved);
         setSubmissions(submitted);
+        setProgress(tracked);
+        setReviews(mine);
       })
       .catch((error) => {
         console.warn('[dashboard]', error);
         if (active) {
           setBookmarks([]);
           setSubmissions([]);
+          setProgress([]);
+          setReviews([]);
         }
       })
       .finally(() => {
@@ -76,10 +116,11 @@ export default function DashboardPage() {
   const stats = useMemo(
     () => [
       { label: t('dashboard.saved'), value: bookmarks.length, icon: Bookmark, tab: 'saved' },
-      { label: t('dashboard.submissions'), value: submissions.length, icon: UploadCloud, tab: 'submissions' },
+      { label: t('dashboard.inProgress'), value: progressItems.length, icon: TrendingUp, tab: 'progress' },
+      { label: t('dashboard.reviews'), value: reviews.length, icon: MessageSquare, tab: 'reviews' },
       { label: t('dashboard.profile'), value: isVerified ? t('common.verified') : '—', icon: UserRound, tab: 'profile' }
     ],
-    [bookmarks.length, submissions.length, t, isVerified]
+    [bookmarks.length, progressItems.length, reviews.length, t, isVerified]
   );
 
   function setTab(tab) {
@@ -145,7 +186,7 @@ export default function DashboardPage() {
 
           <EmailVerificationBanner className="mt-6" />
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -175,6 +216,8 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 pb-1">
           {[
             { key: 'saved', label: t('dashboard.saved'), count: bookmarks.length },
+            { key: 'progress', label: t('dashboard.inProgress'), count: progressItems.length },
+            { key: 'reviews', label: t('dashboard.reviews'), count: reviews.length },
             { key: 'submissions', label: t('dashboard.submissions'), count: submissions.length },
             { key: 'profile', label: t('dashboard.profile') }
           ].map((tab) => (
@@ -219,6 +262,101 @@ export default function DashboardPage() {
             )
           )}
 
+          {activeTab === 'progress' && (
+            loading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="skeleton h-20 w-full" />
+                ))}
+              </div>
+            ) : progressItems.length ? (
+              <div className="space-y-3">
+                {progressItems.map((entry) => {
+                  const meta = PROGRESS_LABELS[entry.status] || PROGRESS_LABELS.not_started;
+                  const Icon = meta.icon;
+                  return (
+                    <div key={entry.id} className="card flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <span className={`chip ${meta.className}`}>
+                          <Icon className="h-3 w-3" />
+                          {t(meta.key)}
+                        </span>
+                        <h2 className="mt-2 truncate font-display text-lg font-semibold text-ink">
+                          {localized(entry.resource.title, i18n.language)}
+                        </h2>
+                        <p className="mt-0.5 text-xs text-ink-muted">{entry.resource.sourceName}</p>
+                      </div>
+                      <Link to={`/resource/${entry.resource.id}`} className="btn-secondary btn-sm shrink-0">
+                        {t('dashboard.continueLearning')}
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                icon={TrendingUp}
+                title={t('dashboard.emptyProgressTitle')}
+                text={t('dashboard.emptyProgressText')}
+                action={
+                  <Link to="/explore" className="btn-primary">
+                    {t('dashboard.browse')}
+                  </Link>
+                }
+              />
+            )
+          )}
+
+          {activeTab === 'reviews' && (
+            loading ? (
+              <div className="space-y-3">
+                {[0, 1].map((item) => (
+                  <div key={item} className="skeleton h-24 w-full" />
+                ))}
+              </div>
+            ) : reviews.length ? (
+              <div className="space-y-3">
+                {reviews.map((review) => {
+                  const resource = resourceById.get(review.resourceId);
+                  return (
+                    <div key={review.id} className="card p-5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <StarRating value={review.rating} size="sm" />
+                        <span className="text-xs text-ink-muted">
+                          {formatDate(review.updatedAt || review.createdAt, i18n.language)}
+                        </span>
+                        {resource && (
+                          <Link
+                            to={`/resource/${resource.id}`}
+                            className="ms-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900"
+                          >
+                            {localized(resource.title, i18n.language)}
+                            <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                        )}
+                      </div>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-soft">
+                        {review.text}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                icon={MessageSquare}
+                title={t('dashboard.emptyReviewsTitle')}
+                text={t('dashboard.emptyReviewsText')}
+                action={
+                  <Link to="/explore" className="btn-primary">
+                    {t('dashboard.browse')}
+                  </Link>
+                }
+              />
+            )
+          )}
+
           {activeTab === 'submissions' && (
             loading ? (
               <div className="space-y-3">
@@ -243,10 +381,12 @@ export default function DashboardPage() {
                             {resource.type}
                           </span>
                         </div>
-                        <h2 className="mt-2 truncate font-display text-lg font-semibold text-ink">{resource.title}</h2>
+                        <h2 className="mt-2 truncate font-display text-lg font-semibold text-ink">
+                          {localized(resource.title, i18n.language)}
+                        </h2>
                         <p className="mt-0.5 text-xs text-ink-muted">
                           {t('dashboard.submittedOn', { date: formatDate(resource.createdAt, i18n.language) })}
-                          {resource.provider ? ` · ${resource.provider}` : ''}
+                          {resource.sourceName ? ` · ${resource.sourceName}` : ''}
                         </p>
                         {resource.reviewNote && (
                           <p className="mt-2 text-xs text-ink-soft">{resource.reviewNote}</p>

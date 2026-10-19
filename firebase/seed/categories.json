@@ -1,0 +1,130 @@
+[
+  {
+    "id": "computer-science",
+    "slug": "computer-science",
+    "name": { "en": "Computer Science", "bn": "কম্পিউটার বিজ্ঞান", "ur": "کمپیوٹر سائنس" },
+    "type": "all",
+    "icon": "Cpu",
+    "order": 1
+  },
+  {
+    "id": "web-development",
+    "slug": "web-development",
+    "name": { "en": "Web Development", "bn": "ওয়েব ডেভেলপমেন্ট", "ur": "ویب ڈیولپمنٹ" },
+    "type": "all",
+    "icon": "Globe2",
+    "order": 2
+  },
+  {
+    "id": "data-science",
+    "slug": "data-science",
+    "name": { "en": "Data Science", "bn": "ডেটা সায়েন্স", "ur": "ڈیٹا سائنس" },
+    "type": "all",
+    "icon": "BarChart3",
+    "order": 3
+  },
+  {
+    "id": "mathematics",
+    "slug": "mathematics",
+    "name": { "en": "Mathematics", "bn": "গণিত", "ur": "ریاضی" },
+    "type": "all",
+    "icon": "Sigma",
+    "order": 4
+  },
+  {
+    "id": "engineering",
+    "slug": "engineering",
+    "name": { "en": "Engineering", "bn": "প্রকৌশল", "ur": "انجینئرنگ" },
+    "type": "all",
+    "icon": "Wrench",
+    "order": 5
+  },
+  {
+    "id": "science",
+    "slug": "science",
+    "name": { "en": "Science", "bn": "বিজ্ঞান", "ur": "سائنس" },
+    "type": "all",
+    "icon": "Atom",
+    "order": 6
+  },
+  {
+    "id": "design-creative",
+    "slug": "design-creative",
+    "name": { "en": "Design & Creative", "bn": "ডিজাইন ও সৃজনশীলতা", "ur": "ڈیزائن اور تخلیقی" },
+    "type": "all",
+    "icon": "Palette",
+    "order": 7
+  },
+  {
+    "id": "development-tools",
+    "slug": "development-tools",
+    "name": { "en": "Development Tools", "bn": "ডেভেলপমেন্ট টুলস", "ur": "ڈیولپمنٹ ٹولز" },
+    "type": "software",
+    "icon": "Terminal",
+    "order": 8
+  },
+  {
+    "id": "office-productivity",
+    "slug": "office-productivity",
+    "name": { "en": "Office & Productivity", "bn": "অফিস ও উৎপাদনশীলতা", "ur": "آفس اور پیداواری" },
+    "type": "software",
+    "icon": "Briefcase",
+    "order": 9
+  },
+  {
+    "id": "media-audio",
+    "slug": "media-audio",
+    "name": { "en": "Media & Audio", "bn": "মিডিয়া ও অডিও", "ur": "میڈیا اور آڈیو" },
+    "type": "software",
+    "icon": "Music",
+    "order": 10
+  },
+  {
+    "id": "digital-skills",
+    "slug": "digital-skills",
+    "name": { "en": "Digital Skills", "bn": "ডিজিটাল দক্ষতা", "ur": "ڈیجیٹل مہارتیں" },
+    "type": "all",
+    "icon": "Smartphone",
+    "order": 11
+  },
+  {
+    "id": "business-career",
+    "slug": "business-career",
+    "name": { "en": "Business & Career", "bn": "ব্যবসা ও ক্যারিয়ার", "ur": "کاروبار اور کیریئر" },
+    "type": "all",
+    "icon": "Briefcase",
+    "order": 12
+  },
+  {
+    "id": "study-skills",
+    "slug": "study-skills",
+    "name": { "en": "Study Skills", "bn": "পড়াশোনার দক্ষতা", "ur": "مطالعہ کی مہارتیں" },
+    "type": "all",
+    "icon": "BookOpen",
+    "order": 13
+  },
+  {
+    "id": "school-college",
+    "slug": "school-college",
+    "name": { "en": "School & College", "bn": "স্কুল ও কলেজ", "ur": "اسکول اور کالج" },
+    "type": "all",
+    "icon": "GraduationCap",
+    "order": 14
+  },
+  {
+    "id": "literature",
+    "slug": "literature",
+    "name": { "en": "Literature", "bn": "সাহিত্য", "ur": "ادب" },
+    "type": "book",
+    "icon": "BookMarked",
+    "order": 15
+  },
+  {
+    "id": "general-learning",
+    "slug": "general-learning",
+    "name": { "en": "General Learning", "bn": "সাধারণ শিক্ষা", "ur": "عمومی تعلیم" },
+    "type": "all",
+    "icon": "Sparkles",
+    "order": 16
+  }
+]

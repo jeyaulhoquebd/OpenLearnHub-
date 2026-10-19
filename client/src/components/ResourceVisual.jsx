@@ -68,9 +68,9 @@ export default function ResourceVisual({ resource, className = '', showIcon = tr
         </div>
         <div>
           <p className="font-display text-3xl font-semibold tracking-tight text-white/95">
-            {monogram(resource?.provider || resource?.title)}
+            {monogram(resource?.sourceName || resource?.title)}
           </p>
-          <p className="mt-1 line-clamp-2 text-xs font-medium text-white/80">{resource?.provider}</p>
+          <p className="mt-1 line-clamp-2 text-xs font-medium text-white/80">{resource?.sourceName}</p>
         </div>
       </div>
     </div>

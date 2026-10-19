@@ -8,6 +8,7 @@ import { REPORT_REASONS } from '../lib/constants';
 import { submitReport } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { reportSchema, sanitizeText } from '../lib/validation';
+import { localized } from '../lib/utils';
 import EmailVerificationBanner from './EmailVerificationBanner';
 
 export default function ReportModal({ open, onClose, resource }) {
@@ -58,9 +59,9 @@ export default function ReportModal({ open, onClose, resource }) {
       await submitReport(
         {
           resourceId: resource.id,
-          resourceTitle: sanitizeText(resource.title, { max: 220 }),
+          resourceTitle: sanitizeText(localized(resource.title, i18n.language), { max: 220 }),
           resourceType: resource.type,
-          resourceUrl: sanitizeText(resource.url, { max: 600 }),
+          resourceUrl: sanitizeText(resource.sourceUrl, { max: 600 }),
           reason: values.reason,
           details: sanitizeText(values.details, { max: 1000, multiline: true }),
           email: sanitizeText(values.email, { max: 200 }),
@@ -142,7 +143,9 @@ export default function ReportModal({ open, onClose, resource }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
                 {t('report.resource')}
               </p>
-              <p className="mt-1 line-clamp-2 text-sm font-semibold text-ink">{resource.title}</p>
+              <p className="mt-1 line-clamp-2 text-sm font-semibold text-ink">
+                {localized(resource.title, i18n.language)}
+              </p>
             </div>
 
             <div>

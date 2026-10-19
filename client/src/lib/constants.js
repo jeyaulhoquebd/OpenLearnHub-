@@ -75,5 +75,14 @@ export const COUNTRY_FLAGS = {
 export const SORT_OPTIONS = [
   { value: 'recommended', labelKey: 'filters.sortRecommended' },
   { value: 'newest', labelKey: 'filters.sortNewest' },
+  { value: 'rating', labelKey: 'filters.sortRating' },
+  { value: 'popular', labelKey: 'filters.sortPopular' },
   { value: 'az', labelKey: 'filters.sortAZ' }
 ];
+
+export const RATING_OPTIONS = [
+  { value: '4', labelKey: 'filters.rating4' },
+  { value: '3', labelKey: 'filters.rating3' }
+];
+
+export const PAGE_SIZE = 12;

@@ -6,9 +6,11 @@ import {
   ArrowUpRight,
   BadgeCheck,
   BookOpen,
+  Bookmark,
   CalendarCheck,
   Check,
   ExternalLink,
+  Eye,
   Flag,
   Globe2,
   Languages,
@@ -24,6 +26,9 @@ import ResourceVisual from '../components/ResourceVisual';
 import BookmarkButton from '../components/BookmarkButton';
 import ReportModal from '../components/ReportModal';
 import ResourceCard from '../components/ResourceCard';
+import ReviewSection from '../components/ReviewSection';
+import ProgressControl from '../components/ProgressControl';
+import StarRating from '../components/StarRating';
 import { PageLoader } from '../components/LoadingStates';
 import EmptyState from '../components/EmptyState';
 import { useResources } from '../hooks/useResources';
@@ -32,11 +37,11 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchResourceById, getRelatedResources } from '../lib/data';
 import { COUNTRY_FLAGS, TYPE_META } from '../lib/constants';
-import { formatDate } from '../lib/utils';
+import { formatDate, formatNumber, localized } from '../lib/utils';
 
 export default function ResourceDetailPage() {
   const { id } = useParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { push } = useToast();
   const { isAdmin, user } = useAuth();
   const { resources } = useResources();
@@ -44,7 +49,11 @@ export default function ResourceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
 
-  usePageMeta(resource?.title || t('common.loading'), resource?.description);
+  const localizedTitle = localized(resource?.title, i18n.language);
+  const localizedDescription = localized(resource?.description, i18n.language);
+  const localizedLongDescription = localized(resource?.longDescription, i18n.language) || localizedDescription;
+
+  usePageMeta(localizedTitle || t('common.loading'), localizedDescription);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +134,7 @@ export default function ResourceDetailPage() {
     const shareUrl = `${window.location.origin}/resource/${resource.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: resource.title, text: resource.description, url: shareUrl });
+        await navigator.share({ title: localizedTitle, text: localizedDescription, url: shareUrl });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         push(t('common.copied'));
@@ -171,18 +180,36 @@ export default function ResourceDetailPage() {
               </div>
 
               <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
-                {resource.provider}
+                {resource.sourceName}
               </p>
               <h1 className="mt-2 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-ink sm:text-5xl">
-                {resource.title}
+                {localizedTitle}
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
-                {resource.description}
+                {localizedDescription}
               </p>
+
+              {resource.ratingCount > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-ink-muted">
+                  <StarRating value={resource.ratingAvg} count={resource.ratingCount} />
+                  {resource.viewCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Eye className="h-3.5 w-3.5" />
+                      {t('resource.views', { count: formatNumber(resource.viewCount, i18n.language) })}
+                    </span>
+                  )}
+                  {resource.saveCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Bookmark className="h-3.5 w-3.5" />
+                      {t('resource.saves', { count: formatNumber(resource.saveCount, i18n.language) })}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="mt-7 flex flex-wrap items-center gap-2.5">
                 <a
-                  href={resource.url}
+                  href={resource.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary btn-lg"
@@ -227,7 +254,7 @@ export default function ResourceDetailPage() {
             <div className="card p-6 sm:p-8">
               <h2 className="font-display text-2xl font-semibold text-ink">{t('resource.aboutTitle')}</h2>
               <div className="mt-4 space-y-4 text-[15px] leading-7 text-ink-soft">
-                {(resource.longDescription || resource.description).split('\n').map((paragraph, index) => (
+                {localizedLongDescription.split('\n').map((paragraph, index) => (
                   <p key={index}>{paragraph}</p>
                 ))}
               </div>
@@ -287,7 +314,7 @@ export default function ResourceDetailPage() {
                     <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {t('resource.provider')}
                   </dt>
-                  <dd className="mt-1 ps-7 font-medium text-ink">{resource.provider}</dd>
+                  <dd className="mt-1 ps-7 font-medium text-ink">{resource.sourceName}</dd>
                 </div>
                 {resource.author && (
                   <div className="py-3">
@@ -377,7 +404,7 @@ export default function ResourceDetailPage() {
               </dl>
 
               <a
-                href={resource.url}
+                href={resource.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary mt-4 w-full justify-center"
@@ -390,8 +417,12 @@ export default function ResourceDetailPage() {
                 {t('resource.officialSource')}
               </p>
             </div>
+
+            <ProgressControl resourceId={resource.id} className="mt-4" />
           </aside>
         </div>
+
+        <ReviewSection resourceId={resource.id} />
 
         {related.length > 0 && (
           <div className="mt-14">
