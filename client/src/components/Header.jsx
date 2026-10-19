@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Menu, Plus, Search, Sparkles, X } from 'lucide-react';
+import { Menu, Plus, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeToggle from './ThemeToggle';
@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -78,6 +78,16 @@ export default function Header() {
           </Link>
           <ThemeToggle />
           <LanguageSwitcher />
+          {/* Only administrators ever see this link. */}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="inline-flex items-center gap-1.5 rounded-full border border-accent-200 bg-accent-50 px-3 py-1.5 text-xs font-bold text-accent-700 transition hover:border-accent-400 hover:bg-accent-100 dark:border-accent-500/40 dark:bg-accent-500/10 dark:text-accent-200 dark:hover:bg-accent-500/20"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('nav.admin')}
+            </Link>
+          )}
           {user ? (
             <>
               <Link to="/submit" className="btn-secondary btn-sm">
@@ -154,6 +164,12 @@ export default function Header() {
                   <Link to="/dashboard" className="btn-secondary justify-center">
                     {t('nav.dashboard')}
                   </Link>
+                  {isAdmin && (
+                    <Link to="/admin" className="btn-secondary justify-center">
+                      <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                      {t('nav.admin')}
+                    </Link>
+                  )}
                 </>
               ) : (
                 <>

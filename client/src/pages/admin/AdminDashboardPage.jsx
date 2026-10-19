@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
   ArrowUpRight,
+  BadgeCheck,
   Check,
   CheckCircle2,
   Clock3,
@@ -16,35 +17,52 @@ import {
   Star,
   X
 } from 'lucide-react';
-import EmptyState from '../components/EmptyState';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { usePageMeta } from '../hooks/usePageMeta';
+import EmptyState from '../../components/EmptyState';
+import PageHeader from '../../components/admin/ui/PageHeader';
+import StatCard from '../../components/admin/ui/StatCard';
+import Tabs from '../../components/admin/ui/Tabs';
+import ConfirmDialog from '../../components/admin/ui/ConfirmDialog';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   fetchAdminCounts,
   fetchPendingResources,
   fetchReports,
   markReportResolved,
   updateResourceStatus
-} from '../lib/data';
-import { invalidateResourceCache } from '../lib/resourceCache';
-import { REPORT_REASONS, TYPE_META } from '../lib/constants';
-import { formatDate, localized } from '../lib/utils';
+} from '../../lib/data';
+import { getAdminMe } from '../../lib/api';
+import { invalidateResourceCache } from '../../lib/resourceCache';
+import { REPORT_REASONS, TYPE_META } from '../../lib/constants';
+import { formatDate, localized } from '../../lib/utils';
 
-export default function AdminPage() {
+/**
+ * Admin dashboard: headline numbers, the submission queue, the report queue and
+ * a card confirming the caller's admin claim (verified by the API, not just the
+ * client).
+ */
+export default function AdminDashboardPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { push } = useToast();
+
   const [tab, setTab] = useState('pending');
   const [pending, setPending] = useState([]);
   const [reports, setReports] = useState([]);
   const [counts, setCounts] = useState({ resources: 0, pending: 0, reports: 0 });
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  usePageMeta(t('admin.title'));
+  const [rejectTarget, setRejectTarget] = useState(null);
+
+  const [me, setMe] = useState(null);
+  const [meError, setMeError] = useState('');
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      // No session (e.g. the demo/preview build): never leave the UI spinning.
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [pendingItems, reportItems, countItems] = await Promise.all([
@@ -56,7 +74,7 @@ export default function AdminPage() {
       setReports(reportItems);
       setCounts(countItems);
     } catch (error) {
-      console.warn('[admin]', error);
+      console.warn('[admin-dashboard]', error);
       push(t('admin.error'), { type: 'error' });
     } finally {
       setLoading(false);
@@ -67,14 +85,45 @@ export default function AdminPage() {
     load();
   }, [load]);
 
-  const openReports = useMemo(() => reports.filter((report) => report.status !== 'resolved'), [reports]);
+  // Server-side confirmation of the admin claim (GET /api/admin/me).
+  useEffect(() => {
+    let active = true;
+    if (!user) return undefined;
+
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const payload = await getAdminMe(token);
+        if (active) {
+          setMe(payload?.admin || null);
+          setMeError('');
+        }
+      } catch (error) {
+        console.warn('[admin-dashboard] /api/admin/me unavailable:', error?.message);
+        if (active) setMeError(error?.message || t('admin.dashboard.meError'));
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [user, t]);
+
+  const openReports = useMemo(
+    () => reports.filter((report) => report.status !== 'resolved'),
+    [reports]
+  );
 
   async function handleApprove(resource) {
     setBusyId(resource.id);
     try {
       await updateResourceStatus({ id: resource.id, status: 'published', reviewerUid: user.uid });
       setPending((items) => items.filter((item) => item.id !== resource.id));
-      setCounts((current) => ({ ...current, pending: Math.max(0, current.pending - 1), resources: current.resources + 1 }));
+      setCounts((current) => ({
+        ...current,
+        pending: Math.max(0, current.pending - 1),
+        resources: current.resources + 1
+      }));
       invalidateResourceCache();
       push(t('admin.approveSuccess'));
     } catch (error) {
@@ -86,7 +135,6 @@ export default function AdminPage() {
   }
 
   async function handleReject(resource) {
-    if (!window.confirm(t('admin.confirmReject'))) return;
     setBusyId(resource.id);
     try {
       await updateResourceStatus({
@@ -103,6 +151,7 @@ export default function AdminPage() {
       push(t('admin.error'), { type: 'error' });
     } finally {
       setBusyId(null);
+      setRejectTarget(null);
     }
   }
 
@@ -128,89 +177,70 @@ export default function AdminPage() {
     return reason ? t(reason.labelKey) : value;
   }
 
-  const statCards = [
-    { label: t('admin.published'), value: counts.resources, icon: Star, color: 'bg-brand-50 text-brand-700' },
-    { label: t('admin.pending'), value: pending.length, icon: Clock3, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
-    { label: t('admin.openReports'), value: openReports.length, icon: Flag, color: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' }
-  ];
+  const displayName = me?.name || user?.displayName || user?.email || '';
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-navy-950 pb-10 pt-10 text-white">
-        <div className="pointer-events-none absolute inset-0 bg-grid opacity-10" />
-        <div className="pointer-events-none absolute -end-20 -top-24 h-72 w-72 rounded-full bg-navy-500/20 blur-3xl" />
-        <div className="container-page relative">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <span className="chip bg-white/10 text-white ring-white/20">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {t('admin.eyebrow')}
-              </span>
-              <h1 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">{t('admin.title')}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-navy-100/75">{t('admin.subtitle')}</p>
-            </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Link to="/admin/ai" className="btn border border-white/20 bg-white/10 text-white hover:bg-white/15">
-                <Sparkles className="h-4 w-4" />
-                {t('adminAi.title')}
-              </Link>
-              <button
-                type="button"
-                onClick={load}
-                disabled={loading}
-                className="btn border border-white/20 bg-white/10 text-white hover:bg-white/15"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                {t('admin.refresh')}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
-            {statCards.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-                  <span className={`grid h-11 w-11 place-items-center rounded-2xl ${stat.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="font-display text-2xl font-semibold">{loading ? '—' : stat.value}</p>
-                    <p className="text-xs text-navy-100/70">{stat.label}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="container-page py-9">
-        <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 pb-1">
-          {[
-            { key: 'pending', label: t('admin.pending'), count: pending.length },
-            { key: 'reports', label: t('admin.reports'), count: openReports.length }
-          ].map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setTab(item.key)}
-              className={`relative rounded-t-xl px-4 py-3 text-sm font-semibold transition ${
-                tab === item.key ? 'text-brand-800' : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              {item.label}
-              <span className="ms-1.5 rounded-full bg-sand-100 px-1.5 py-0.5 text-[10px] text-ink-muted">{item.count}</span>
-              {tab === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-navy-700" />}
+      <PageHeader
+        eyebrow={t('admin.eyebrow')}
+        title={t('admin.dashboard.title')}
+        description={t('admin.dashboard.description')}
+        actions={
+          <>
+            <Link to="/admin/ai" className="btn-secondary btn-sm">
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              {t('adminAi.title')}
+            </Link>
+            <button type="button" onClick={load} disabled={loading} className="btn-primary btn-sm">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {t('admin.refresh')}
             </button>
-          ))}
-        </div>
+          </>
+        }
+      />
 
-        <div className="mt-7">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={Star}
+          tone="brand"
+          label={t('admin.published')}
+          value={counts.resources}
+          loading={loading}
+        />
+        <StatCard
+          icon={Clock3}
+          tone="amber"
+          label={t('admin.pending')}
+          value={pending.length}
+          loading={loading}
+        />
+        <StatCard
+          icon={Flag}
+          tone="rose"
+          label={t('admin.openReports')}
+          value={openReports.length}
+          loading={loading}
+        />
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+        <section>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <Tabs
+              ariaLabel={t('admin.dashboard.queueLabel')}
+              value={tab}
+              onChange={setTab}
+              items={[
+                { key: 'pending', label: t('admin.pending'), icon: Clock3, badge: pending.length },
+                { key: 'reports', label: t('admin.reports'), icon: Flag, badge: openReports.length }
+              ]}
+            />
+          </div>
+
           {loading ? (
             <div className="space-y-4">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="skeleton h-40 w-full" />
+                <div key={item} className="skeleton h-40 w-full rounded-2xl" />
               ))}
             </div>
           ) : tab === 'pending' ? (
@@ -225,7 +255,7 @@ export default function AdminPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`chip ${meta.chip}`}>{t(meta.labelKey)}</span>
                             <span className="chip bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
-                              <Clock3 className="h-3 w-3" />
+                              <Clock3 className="h-3 w-3" aria-hidden="true" />
                               {t('dashboard.statusPending')}
                             </span>
                           </div>
@@ -241,28 +271,30 @@ export default function AdminPage() {
 
                           <div className="mt-4 grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
                             <p className="flex items-center gap-1.5">
-                              <ShieldCheck className="h-3.5 w-3.5 text-brand-600" />
+                              <ShieldCheck className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
                               {resource.license}
                             </p>
                             <p className="flex items-center gap-1.5">
-                              <Clock3 className="h-3.5 w-3.5" />
+                              <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
                               {t('admin.submittedOn')}: {formatDate(resource.createdAt, i18n.language)}
                             </p>
                             <p className="flex items-center gap-1.5">
-                              <ArrowUpRight className="h-3.5 w-3.5" />
+                              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                               {t('admin.submittedBy')}: {resource.creatorEmail || resource.createdBy}
                             </p>
                           </div>
 
-                          <a
-                            href={resource.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 inline-flex max-w-full items-center gap-1.5 truncate text-xs font-semibold text-brand-700 underline underline-offset-2"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{resource.sourceUrl}</span>
-                          </a>
+                          {resource.sourceUrl && (
+                            <a
+                              href={resource.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 inline-flex max-w-full items-center gap-1.5 truncate text-xs font-semibold text-brand-700 underline underline-offset-2 dark:text-brand-300"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{resource.sourceUrl}</span>
+                            </a>
+                          )}
                         </div>
 
                         <div className="flex shrink-0 flex-wrap gap-2 lg:flex-col">
@@ -272,7 +304,11 @@ export default function AdminPage() {
                             disabled={busyId === resource.id}
                             className="btn-primary btn-sm justify-center"
                           >
-                            {busyId === resource.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            {busyId === resource.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Check className="h-4 w-4" aria-hidden="true" />
+                            )}
                             {t('admin.approve')}
                           </button>
                           <Link to={`/resource/${resource.id}`} className="btn-secondary btn-sm justify-center">
@@ -280,11 +316,11 @@ export default function AdminPage() {
                           </Link>
                           <button
                             type="button"
-                            onClick={() => handleReject(resource)}
+                            onClick={() => setRejectTarget(resource)}
                             disabled={busyId === resource.id}
                             className="btn btn-sm justify-center border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4" aria-hidden="true" />
                             {t('admin.reject')}
                           </button>
                         </div>
@@ -294,7 +330,11 @@ export default function AdminPage() {
                 })}
               </div>
             ) : (
-              <EmptyState icon={CheckCircle2} title={t('admin.noPendingTitle')} text={t('admin.noPendingText')} />
+              <EmptyState
+                icon={CheckCircle2}
+                title={t('admin.noPendingTitle')}
+                text={t('admin.noPendingText')}
+              />
             )
           ) : reports.length ? (
             <div className="space-y-4">
@@ -306,18 +346,20 @@ export default function AdminPage() {
                         <span
                           className={`chip ${
                             report.status === 'resolved'
-                              ? 'bg-brand-50 text-brand-800 ring-brand-200'
-                              : 'bg-rose-50 text-rose-700 ring-rose-200'
+                              ? 'bg-brand-50 text-brand-800 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/30'
+                              : 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30'
                           }`}
                         >
                           {report.status === 'resolved' ? (
-                            <CheckCircle2 className="h-3 w-3" />
+                            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                           ) : (
-                            <AlertTriangle className="h-3 w-3" />
+                            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                           )}
                           {report.status === 'resolved' ? t('admin.resolved') : t('admin.open')}
                         </span>
-                        <span className="chip bg-sand-100 text-ink-soft ring-sand-200">{reasonLabel(report.reason)}</span>
+                        <span className="chip bg-sand-100 text-ink-soft ring-sand-200">
+                          {reasonLabel(report.reason)}
+                        </span>
                       </div>
 
                       <h2 className="mt-3 font-display text-lg font-semibold text-ink">
@@ -330,7 +372,8 @@ export default function AdminPage() {
                       )}
                       <div className="mt-3 grid gap-1.5 text-xs text-ink-muted sm:grid-cols-2">
                         <p>
-                          {t('admin.reporter')}: {report.reporterEmail || report.reporterUid || t('admin.anonymous')}
+                          {t('admin.reporter')}:{' '}
+                          {report.reporterEmail || report.reporterUid || t('admin.anonymous')}
                         </p>
                         <p>
                           {t('admin.submittedOn')}: {formatDate(report.createdAt, i18n.language)}
@@ -340,9 +383,12 @@ export default function AdminPage() {
 
                     <div className="flex shrink-0 flex-wrap gap-2 lg:flex-col">
                       {report.resourceId && (
-                        <Link to={`/resource/${report.resourceId}`} className="btn-secondary btn-sm justify-center">
+                        <Link
+                          to={`/resource/${report.resourceId}`}
+                          className="btn-secondary btn-sm justify-center"
+                        >
                           {t('admin.resource')}
-                          <ArrowUpRight className="h-3.5 w-3.5" />
+                          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
                       )}
                       {report.status !== 'resolved' && (
@@ -352,7 +398,11 @@ export default function AdminPage() {
                           disabled={busyId === report.id}
                           className="btn-primary btn-sm justify-center"
                         >
-                          {busyId === report.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          {busyId === report.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                          )}
                           {t('admin.resolve')}
                         </button>
                       )}
@@ -364,8 +414,59 @@ export default function AdminPage() {
           ) : (
             <EmptyState icon={Flag} title={t('admin.noReportsTitle')} text={t('admin.noReportsText')} />
           )}
-        </div>
-      </section>
+        </section>
+
+        <aside className="rounded-2xl border border-sand-200 bg-surface p-5 shadow-soft">
+          <p className="flex items-center gap-2 text-sm font-bold text-ink">
+            <BadgeCheck className="h-4 w-4 text-accent-600" aria-hidden="true" />
+            {t('admin.dashboard.yourAccess')}
+          </p>
+
+          <p className="mt-3 truncate font-display text-lg font-semibold text-ink">
+            {displayName || '—'}
+          </p>
+          <p className="truncate text-xs text-ink-muted">{me?.email || user?.email}</p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="chip bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              {t('admin.dashboard.claimActive')}
+            </span>
+            {me?.providers?.map((provider) => (
+              <span key={provider} className="chip bg-sand-100 text-ink-soft ring-sand-200">
+                {provider}
+              </span>
+            ))}
+          </div>
+
+          <dl className="mt-4 space-y-2 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-ink-muted">{t('admin.dashboard.lastSignIn')}</dt>
+              <dd className="text-ink-soft">{me?.lastSignInAt ? formatDate(me.lastSignInAt, i18n.language) : '—'}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-ink-muted">{t('admin.dashboard.accountId')}</dt>
+              <dd className="max-w-[10rem] truncate font-mono text-[11px] text-ink-soft">{user?.uid}</dd>
+            </div>
+          </dl>
+
+          {meError && (
+            <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+              {t('admin.dashboard.meOffline')}
+            </p>
+          )}
+        </aside>
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(rejectTarget)}
+        title={t('admin.reject')}
+        message={t('admin.confirmReject')}
+        confirmLabel={t('admin.reject')}
+        loading={busyId === rejectTarget?.id}
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={() => rejectTarget && handleReject(rejectTarget)}
+      />
     </>
   );
 }

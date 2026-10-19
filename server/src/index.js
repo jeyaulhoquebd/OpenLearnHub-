@@ -68,6 +68,7 @@ app.get('/', (req, res) => {
       '/api/reports',
       '/api/ai/chat',
       '/api/ai/roadmap',
+      '/api/admin/me',
       '/api/admin/settings/ai/status'
     ]
   });

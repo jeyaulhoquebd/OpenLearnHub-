@@ -88,7 +88,6 @@ export function getFirebaseInitError() {
   return initError;
 }
 
-export function isAdminEmail(email) {
-  if (!email) return false;
-  return config.firebase.adminEmails.includes(String(email).toLowerCase());
-}
+// Administrator status is read from the `admin` custom claim only (see
+// server/scripts/set-admin.js and middleware/requireAdmin.js). There is
+// deliberately no email-based shortcut here.

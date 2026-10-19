@@ -228,16 +228,21 @@ This writes the 35 records in `firebase/seed/resources.json` into the `resources
 
 ### 7. Create your first admin
 
-1. Start the app and **sign up** with the email in `ADMIN_EMAILS`.
+1. Start the app and **sign up** (with the email in `ADMIN_EMAILS` if you set one).
 2. Run:
 
 ```bash
-# from the repository root
-npm run set-admin -w server -- --email=you@example.com
-# or: cd server && npm run set-admin -- --email=you@example.com
+# from the repository root — accepts a UID or an email address
+npm run set-admin -w server -- fEbrHXzHl2hkvo7wZQw9wzinMlx1
+npm run set-admin -w server -- you@example.com
+# revoke admin access again
+npm run set-admin -w server -- you@example.com --remove
+# or run it directly: cd server && node scripts/set-admin.js <uid-or-email>
 ```
 
-The script sets the `admin: true` **custom claim**. **Sign out and back in** (or refresh the ID token) so the new claim is applied, then open `/admin`. The client reads admin rights from `getIdTokenResult()` — there is no client-writable `role` field.
+With no argument, the script uses the first address in `ADMIN_EMAILS`, falling back to the project's first admin UID. It sets (or clears) the `admin: true` **custom claim** and appends an `admin.grant` / `admin.revoke` entry to the server-only audit log.
+
+**Sign out and back in** (or refresh the ID token) so the new claim is applied, then open `/admin`. The client reads admin rights from `getIdTokenResult()` — there is no client-writable `role` field.
 
 ### 8. Run
 
@@ -315,7 +320,7 @@ Leaving the six required Firebase values empty is supported and enables preview 
 | `FIREBASE_PRIVATE_KEY` | One auth option | `private_key` (keep the `\n` escapes) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | One auth option | Path to a service-account file (local dev / ADC) |
 | `FIREBASE_STORAGE_BUCKET` | No | Explicit storage bucket |
-| `ADMIN_EMAILS` | Recommended | Default admin email(s) for `set-admin` |
+| `ADMIN_EMAILS` | Optional | Default target email for `set-admin` when no argument is given |
 | `GEMINI_API_KEY` | For LearnMate | Server-side Gemini key (fallback when none is stored) |
 | `GEMINI_MODEL` | No | Default `gemini-2.5-flash` |
 | `GEMINI_TIMEOUT_MS` | No | Default `30000` |
@@ -395,6 +400,7 @@ data keeps rendering during the migration.
 | `roadmaps/{id}` | owner | owner (bounded content, no updates) |
 | `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; daily AI quota) |
 | `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
+| `auditLogs/{id}` | **nobody** | **nobody** (Admin SDK only; admin action trail) |
 
 `categories` seed data lives in `firebase/seed/categories.json` and
 `alternatives` (the "free alternatives to paid software" pairs) in
@@ -449,6 +455,7 @@ Base URL: `http://localhost:8080` in development.
 | `POST` | `/api/reports` | Optional Firebase ID token | Create a report about a resource (IP rate-limited) |
 | `POST` | `/api/ai/chat` | Firebase ID token | LearnMate reply grounded in curated resources |
 | `POST` | `/api/ai/roadmap` | Firebase ID token + verified email | Structured study roadmap grounded in curated resources (hourly + daily limits) |
+| `GET` | `/api/admin/me` | Admin claim | Confirms the caller's admin claim and returns basic profile fields |
 | `GET` | `/api/admin/settings/ai/status` | Admin claim | Masked AI configuration status (never returns the key) |
 | `POST` | `/api/admin/settings/ai` | Admin claim | Store/clear the encrypted Gemini key + model |
 | `POST` | `/api/admin/settings/ai/test` | Admin claim | Verify a candidate or active key with a minimal Gemini call |
@@ -597,7 +604,25 @@ Ports are defined in `firebase.json`: Auth `9099`, Firestore `8085`, Storage `91
 5. Reports appear in the admin dashboard. Resolving one sets `status: "resolved"`, `resolvedBy`, and `resolvedAt`.
 6. If a copyright claim is valid, unpublish or delete the resource and reply to the reporter using the contact email they provided.
 
-Admin access requires either the `admin` custom claim or `users/{uid}.role === "admin"`. Grant it only with `scripts/set-admin.js` (or deliberately in the console).
+Admin access comes **only** from the `admin: true` custom claim (set with `scripts/set-admin.js`). The Express API verifies it in `server/src/middleware/requireAdmin.js`; Firestore rules check `request.auth.token.admin`; the client checks `getIdTokenResult()`. No Firestore field grants admin rights, so a user can never promote themselves.
+
+### Admin panel
+
+`/admin/*` is a separate workspace with its own navy sidebar and top bar — the public header, footer and floating assistant are not rendered there.
+
+| Route | Screen |
+| --- | --- |
+| `/admin` | Dashboard: library counters, submission queue, report queue, admin-access card |
+| `/admin/resources`, `/admin/categories`, `/admin/alternatives` | Content tools (next step) |
+| `/admin/users`, `/admin/reviews`, `/admin/reports` | Community tools (next step) |
+| `/admin/link-checker`, `/admin/import-export` | Maintenance tools (next step) |
+| `/admin/ai` | AI Settings — store the encrypted Gemini key (working today) |
+| `/admin/settings`, `/admin/audit-log` | Site settings and the read-only action trail |
+
+- **Guard:** `components/admin/AdminRoute.jsx` waits for auth, re-checks the current ID token, and redirects non-admins home with a translated "Access denied" toast. The public navbar shows a small **Admin** link to admins only.
+- **Shell:** `components/admin/AdminLayout.jsx` renders a collapsible sidebar (state kept in `localStorage`), a mobile drawer, breadcrumbs, theme and language switches, a report counter, and the account menu. Every admin screen is `React.lazy`-loaded.
+- **UI kit:** `components/admin/ui/` provides `PageHeader`, `StatCard`, `DataTable`, `ConfirmDialog`, `Modal`, `Drawer`, `StatusBadge`, `SearchInput`, `FormField`, `ImageUploader`, `Tabs` and the shared toast hook.
+- **Audit trail:** `server/src/lib/audit.js` appends every privileged action to the server-only `auditLogs` collection. Entries are never readable from a browser, and failed logging never breaks the action itself.
 
 ## Translations and RTL
 
@@ -637,7 +662,7 @@ From the repository root:
 | `npm run preview` | Serve the built client on 4173 |
 | `npm start` | Start the API only |
 | `npm run seed` | Seed Firestore with the curated library |
-| `npm run set-admin -w server -- --email=…` | Grant admin (custom claim) to an existing user |
+| `npm run set-admin -w server -- <uid-or-email>` | Grant the admin claim (`--remove` revokes it) |
 | `npm run check:i18n` | Fail if any en/bn/ur translation key is missing |
 
 ## Troubleshooting

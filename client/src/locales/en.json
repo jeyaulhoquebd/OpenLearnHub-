@@ -489,7 +489,178 @@
     "error": "Could not update this item. Check your admin permissions and try again.",
     "refresh": "Refresh",
     "loading": "Loading moderation data…",
-    "submittedOn": "Submitted"
+    "submittedOn": "Submitted",
+    "accessDenied": "Access denied",
+    "checkingAccess": "Checking your access…",
+    "footer": "OpenLearn Hub admin · {{year}} · Legal, free resources only",
+    "sidebar": {
+      "badge": "Admin",
+      "menuLabel": "Admin navigation",
+      "open": "Open menu",
+      "close": "Close menu",
+      "collapse": "Collapse sidebar",
+      "expand": "Expand sidebar",
+      "backToSite": "Back to site",
+      "groups": {
+        "overview": "Overview",
+        "content": "Content",
+        "community": "Community",
+        "system": "System"
+      },
+      "items": {
+        "dashboard": "Dashboard",
+        "resources": "Resources",
+        "categories": "Categories",
+        "alternatives": "Free Alternatives",
+        "users": "Users",
+        "reviews": "Reviews",
+        "reports": "Reports",
+        "linkChecker": "Link Checker",
+        "importExport": "Import / Export",
+        "aiSettings": "AI Settings",
+        "siteSettings": "Site Settings",
+        "auditLog": "Audit Log"
+      }
+    },
+    "topbar": {
+      "breadcrumbHome": "Admin",
+      "breadcrumbLabel": "Breadcrumb",
+      "searchLabel": "Search the admin panel",
+      "searchPlaceholder": "Search resources, users, reports…",
+      "notifications": "Notifications",
+      "notificationsCount": "{{count}} open",
+      "notificationsHint": "There are open reports waiting for review.",
+      "noNotifications": "No open reports. The queue is clear.",
+      "viewReports": "View reports",
+      "accountMenu": "Account menu",
+      "profile": "My profile",
+      "backToSite": "Back to site",
+      "logout": "Sign out"
+    },
+    "status": {
+      "published": "Published",
+      "draft": "Draft",
+      "pending": "Pending",
+      "flagged": "Flagged",
+      "rejected": "Rejected",
+      "resolved": "Resolved",
+      "open": "Open",
+      "active": "Active",
+      "suspended": "Suspended",
+      "unknown": "Unknown"
+    },
+    "ui": {
+      "search": "Search",
+      "searchPlaceholder": "Search…",
+      "clearSearch": "Clear search",
+      "loading": "Loading…",
+      "emptyTitle": "Nothing here yet",
+      "emptyText": "Rows will appear here once there is data to show.",
+      "selectAll": "Select all rows",
+      "selectRow": "Select row",
+      "pageOf": "Page {{page}} of {{total}}",
+      "total": "{{count}} total",
+      "rowsPerPage": "Rows per page",
+      "previous": "Previous page",
+      "next": "Next page",
+      "optional": "optional",
+      "required": "required",
+      "confirmTitle": "Are you sure?",
+      "confirmText": "This action cannot be undone.",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "close": "Close",
+      "upload": "Upload image",
+      "uploading": "Uploading…",
+      "change": "Change",
+      "remove": "Remove",
+      "dropHint": "Drag an image here, or choose a file.",
+      "imageHint": "PNG, JPG or WebP, up to {{size}} MB.",
+      "imageTypeError": "That file type is not supported. Use PNG, JPG or WebP.",
+      "imageSizeError": "That image is too large. The limit is {{size}} MB.",
+      "imagePreview": "Thumbnail preview"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Review submissions and reports, and keep an eye on the library.",
+      "queueLabel": "Moderation queues",
+      "yourAccess": "Your access",
+      "claimActive": "Admin claim active",
+      "lastSignIn": "Last sign-in",
+      "accountId": "Account ID",
+      "meOffline": "The admin API could not be reached, so this card uses your local session only.",
+      "meError": "Could not confirm admin access with the server."
+    },
+    "pages": {
+      "comingSoon": "Coming next",
+      "placeholderTitle": "This screen is being built",
+      "placeholderText": "The admin shell, routing, translations and permissions are ready. The tools for this section arrive in the next step of the build.",
+      "upcoming": "What this screen will do",
+      "noteTitle": "Guard rails stay on",
+      "noteText": "Every action here runs with your admin claim and is written to the server-side audit log. Client-side rules still apply, so a normal account cannot change anything.",
+      "noteAudit": "Audit entries live in the server-only auditLogs collection and cannot be read or edited from a browser.",
+      "resources": {
+        "title": "Resources",
+        "description": "Create, edit, publish and unpublish every course, book and software listing.",
+        "b1": "Searchable, sortable table of all resources with status filters",
+        "b2": "Add / edit form with multi-language titles, descriptions and thumbnail upload",
+        "b3": "Bulk actions: publish, unpublish, feature and delete"
+      },
+      "categories": {
+        "title": "Categories",
+        "description": "Keep the taxonomy tidy so browsing and filters stay useful.",
+        "b1": "Create and rename categories for courses, books and software",
+        "b2": "Reorder, hide or remove categories that no longer fit"
+      },
+      "alternatives": {
+        "title": "Free Alternatives",
+        "description": "Curate the legal, free replacements shown next to paid products.",
+        "b1": "Link a free resource to the paid tool it replaces",
+        "b2": "Control which alternatives appear on the home page"
+      },
+      "users": {
+        "title": "Users",
+        "description": "Look up accounts, review activity and manage access.",
+        "b1": "Search learners by email or display name",
+        "b2": "Inspect saved resources, progress and review history"
+      },
+      "reviews": {
+        "title": "Reviews",
+        "description": "Moderate community ratings before they damage trust.",
+        "b1": "Filter reviews by resource, rating and date",
+        "b2": "Remove abusive or off-topic reviews"
+      },
+      "reports": {
+        "title": "Reports",
+        "description": "Work through broken-link, copyright and piracy reports.",
+        "b1": "Full report queue with reporter details and resource preview",
+        "b2": "Resolve a report or unpublish the reported resource in one click"
+      },
+      "linkChecker": {
+        "title": "Link Checker",
+        "description": "Make sure every official link still resolves.",
+        "b1": "Batch check saved source URLs from the server",
+        "b2": "Flag dead links and jump straight to the affected listing"
+      },
+      "importExport": {
+        "title": "Import / Export",
+        "description": "Move data in and out without hand-editing Firestore.",
+        "b1": "Bulk import resources from JSON or CSV with validation",
+        "b2": "Export the current library for backup or review"
+      },
+      "siteSettings": {
+        "title": "Site Settings",
+        "description": "Global switches for the public site.",
+        "b1": "Edit contact details and legal page copy",
+        "b2": "Control featured sections and submission rules"
+      },
+      "auditLog": {
+        "title": "Audit Log",
+        "description": "A read-only trail of every privileged action.",
+        "b1": "Filter entries by admin, action and date",
+        "b2": "See exactly what changed and when"
+      }
+    }
   },
   "report": {
     "title": "Report a resource",

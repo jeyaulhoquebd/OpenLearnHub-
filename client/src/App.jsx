@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/admin/AdminRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoader } from './components/LoadingStates';
 import { AuthProvider } from './context/AuthContext';
@@ -15,8 +16,6 @@ const ContactPage = lazy(() => import('./pages/ContactPage'));
 const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
 const SubmitResourcePage = lazy(() => import('./pages/SubmitResourcePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const AdminPage = lazy(() => import('./pages/AdminPage'));
-const AdminAiSettingsPage = lazy(() => import('./pages/AdminAiSettingsPage'));
 const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -26,6 +25,21 @@ const CopyrightPage = lazy(() => import('./pages/CopyrightPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+// Admin shell — kept out of the public bundle and lazy-loaded like every page.
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const AdminResourcesPage = lazy(() => import('./pages/admin/AdminResourcesPage'));
+const AdminCategoriesPage = lazy(() => import('./pages/admin/AdminCategoriesPage'));
+const AdminAlternativesPage = lazy(() => import('./pages/admin/AdminAlternativesPage'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminReviewsPage = lazy(() => import('./pages/admin/AdminReviewsPage'));
+const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminLinkCheckerPage = lazy(() => import('./pages/admin/AdminLinkCheckerPage'));
+const AdminImportExportPage = lazy(() => import('./pages/admin/AdminImportExportPage'));
+const AdminAiSettingsPage = lazy(() => import('./pages/admin/AdminAiSettingsPage'));
+const AdminSiteSettingsPage = lazy(() => import('./pages/admin/AdminSiteSettingsPage'));
+const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 
 function withSuspense(element) {
   return <Suspense fallback={<PageLoader />}>{element}</Suspense>;
@@ -39,6 +53,36 @@ export default function App() {
           <AuthProvider>
             <ToastProvider>
               <Routes>
+                {/*
+                  The admin panel lives outside the public <Layout /> on purpose:
+                  it has its own sidebar/top bar and no marketing header, footer
+                  or floating assistant. AdminRoute re-checks the ID token claim
+                  before the shell is allowed to render.
+                */}
+                <Route
+                  path="admin"
+                  element={withSuspense(
+                    <AdminRoute>
+                      <AdminLayout />
+                    </AdminRoute>
+                  )}
+                >
+                  <Route index element={withSuspense(<AdminDashboardPage />)} />
+                  <Route path="resources" element={withSuspense(<AdminResourcesPage />)} />
+                  <Route path="categories" element={withSuspense(<AdminCategoriesPage />)} />
+                  <Route path="alternatives" element={withSuspense(<AdminAlternativesPage />)} />
+                  <Route path="users" element={withSuspense(<AdminUsersPage />)} />
+                  <Route path="reviews" element={withSuspense(<AdminReviewsPage />)} />
+                  <Route path="reports" element={withSuspense(<AdminReportsPage />)} />
+                  <Route path="link-checker" element={withSuspense(<AdminLinkCheckerPage />)} />
+                  <Route path="import-export" element={withSuspense(<AdminImportExportPage />)} />
+                  <Route path="ai" element={withSuspense(<AdminAiSettingsPage />)} />
+                  <Route path="settings" element={withSuspense(<AdminSiteSettingsPage />)} />
+                  <Route path="audit-log" element={withSuspense(<AdminAuditLogPage />)} />
+                  {/* Unknown admin URLs fall back to the dashboard, not the public 404. */}
+                  <Route path="*" element={<Navigate to="/admin" replace />} />
+                </Route>
+
                 <Route element={<Layout />}>
                   <Route index element={<HomePage />} />
                   <Route path="explore" element={withSuspense(<ExplorePage />)} />
@@ -70,22 +114,6 @@ export default function App() {
                     element={withSuspense(
                       <ProtectedRoute>
                         <DashboardPage />
-                      </ProtectedRoute>
-                    )}
-                  />
-                  <Route
-                    path="admin"
-                    element={withSuspense(
-                      <ProtectedRoute adminOnly>
-                        <AdminPage />
-                      </ProtectedRoute>
-                    )}
-                  />
-                  <Route
-                    path="admin/ai"
-                    element={withSuspense(
-                      <ProtectedRoute adminOnly>
-                        <AdminAiSettingsPage />
                       </ProtectedRoute>
                     )}
                   />

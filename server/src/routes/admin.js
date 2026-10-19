@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/auth.js';
-import { requireAdmin } from '../middleware/admin.js';
+import { requireAdmin } from '../middleware/requireAdmin.js';
 import { apiError } from '../lib/http.js';
 import { sanitizeText } from '../lib/validation.js';
+import { writeAuditLogForRequest } from '../lib/audit.js';
+import { getFirebaseAuth } from '../firebase.js';
 import { getAiSettingsStatus, saveAiSettings, resolveAiConfig } from '../lib/settings.js';
 import { testGeminiKey } from '../lib/ai.js';
 
@@ -28,7 +29,38 @@ export const adminRouter = Router();
 
 // Every admin route requires a verified Firebase ID token with the `admin`
 // custom claim. Admin access is never read from a Firestore field.
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAdmin);
+
+/**
+ * GET /api/admin/me
+ * Basic identity of the signed-in administrator, used by the admin shell.
+ * Confirms server-side that the caller really holds the admin claim.
+ */
+adminRouter.get('/me', async (req, res, next) => {
+  try {
+    const auth = getFirebaseAuth();
+    // Extra profile fields are a nice-to-have: never fail the request if the
+    // Admin SDK lookup is unavailable.
+    const record = auth
+      ? await auth.getUser(req.user.uid).catch(() => null)
+      : null;
+
+    return res.json({
+      admin: {
+        uid: req.user.uid,
+        email: record?.email || req.user.email || null,
+        name: record?.displayName || req.user.name || null,
+        photoURL: record?.photoURL || req.user.picture || null,
+        emailVerified: req.user.email_verified === true,
+        providers: (record?.providerData || []).map((provider) => provider.providerId),
+        lastSignInAt: record?.metadata?.lastSignInTime || null,
+        isAdmin: req.user.admin === true
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 /**
  * GET /api/admin/settings/ai/status
@@ -80,6 +112,19 @@ adminRouter.post('/settings/ai', async (req, res, next) => {
       }
       throw error;
     }
+
+    // Never include the key (or its ciphertext) in the audit entry.
+    await writeAuditLogForRequest(req, {
+      action: 'settings.ai.save',
+      targetType: 'settings',
+      targetId: 'ai',
+      details: {
+        keyChanged: Boolean(apiKey),
+        keyCleared: !apiKey,
+        model: model || null,
+        source: status?.source || null
+      }
+    });
 
     return res.json({ ok: true, status });
   } catch (error) {

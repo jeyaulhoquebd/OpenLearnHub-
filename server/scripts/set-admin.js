@@ -1,60 +1,144 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { config } from '../src/config.js';
 import { getDb, getFirebaseAuth, initFirebase } from '../src/firebase.js';
+import { writeAuditLog } from '../src/lib/audit.js';
 
-function readArg(name) {
+/**
+ * Grants or revokes the `admin: true` custom claim.
+ *
+ *   node scripts/set-admin.js <uid-or-email>
+ *   node scripts/set-admin.js <uid-or-email> --remove
+ *
+ * The target may be a Firebase UID or an email address — anything containing
+ * "@" is treated as an email. When no target is given, the first administrator
+ * account for this project is used.
+ *
+ * Administrator access is granted exclusively through this custom claim. No
+ * Firestore field is ever read to decide whether someone is an admin, so a
+ * user can never promote themselves from the client.
+ */
+
+// First administrator of the openlearn-hub-bd project.
+const DEFAULT_ADMIN_UID = 'fEbrHXzHl2hkvo7wZQw9wzinMlx1';
+
+function readFlag(name) {
   const prefix = `--${name}=`;
   const match = process.argv.find((arg) => arg.startsWith(prefix));
   return match ? match.slice(prefix.length).trim() : '';
 }
 
-async function resolveUser(auth, email, uid) {
-  if (uid) return auth.getUser(uid);
-  if (email) return auth.getUserByEmail(email);
-  return null;
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const remove = args.includes('--remove');
+  const positional = args.find((arg) => !arg.startsWith('-'));
+
+  // `--email=` / `--uid=` are still supported for older notes and tooling.
+  const explicitUid = readFlag('uid');
+  const explicitEmail = readFlag('email');
+  const target = (positional || explicitUid || explicitEmail || '').trim();
+
+  return { remove, target };
+}
+
+function isEmail(value) {
+  return value.includes('@');
+}
+
+async function resolveUser(auth, target) {
+  try {
+    if (isEmail(target)) {
+      return await auth.getUserByEmail(target.toLowerCase());
+    }
+    return await auth.getUser(target);
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') return null;
+    throw error;
+  }
 }
 
 async function main() {
   initFirebase();
+
   const auth = getFirebaseAuth();
   const db = getDb();
 
-  if (!auth || !db) {
-    console.error('[set-admin] Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS.');
-    process.exit(1);
-  }
-
-  const email = readArg('email') || config.firebase.adminEmails[0] || '';
-  const uid = readArg('uid');
-
-  if (!email && !uid) {
-    console.error('[set-admin] Usage: npm run set-admin -- --email=you@example.com');
-    process.exit(1);
-  }
-
-  const user = await resolveUser(auth, email, uid);
-  if (!user) {
-    console.error(`[set-admin] No user found for ${email || uid}. Sign up in the app first.`);
-    process.exit(1);
-  }
-
-  await auth.setCustomUserClaims(user.uid, { ...(user.customClaims || {}), admin: true });
-  await db
-    .collection('users')
-    .doc(user.uid)
-    .set(
-      {
-        uid: user.uid,
-        email: user.email || email || null,
-        displayName: user.displayName || null,
-        updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
+  if (!auth) {
+    console.error(
+      '[set-admin] Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON, ' +
+        'or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, then try again.'
     );
+    process.exit(1);
+  }
 
-  console.log(`[set-admin] ${user.email || user.uid} is now an admin (custom claim: admin=true).`);
-  console.log('[set-admin] The client reads this from getIdTokenResult(). Ask them to sign out and');
-  console.log('[set-admin] sign in again (or refresh their token) so the new claim is applied.');
+  const { remove, target: rawTarget } = parseArgs();
+
+  // Target resolution: CLI argument, then ADMIN_EMAILS (first entry), then the
+  // first administrator account for this project.
+  const envEmail = config.firebase.adminEmails?.[0] || '';
+  const target = rawTarget || envEmail || DEFAULT_ADMIN_UID;
+
+  if (!rawTarget) {
+    console.log(
+      envEmail
+        ? `[set-admin] No UID or email supplied — using ADMIN_EMAILS (${envEmail}).`
+        : `[set-admin] No UID or email supplied — using the first admin UID (${DEFAULT_ADMIN_UID}).`
+    );
+  }
+
+  const user = await resolveUser(auth, target);
+  if (!user) {
+    console.error(`[set-admin] No user found for "${target}". Sign in to the app once, then try again.`);
+    process.exit(1);
+  }
+
+  const currentClaims = user.customClaims || {};
+  const nextClaims = { ...currentClaims };
+
+  if (remove) {
+    delete nextClaims.admin;
+  } else {
+    nextClaims.admin = true;
+  }
+
+  await auth.setCustomUserClaims(user.uid, nextClaims);
+
+  // Make sure the profile document exists so the account shows up nicely in
+  // the app. This is a convenience only — it carries no privileges.
+  if (db) {
+    await db
+      .collection('users')
+      .doc(user.uid)
+      .set(
+        {
+          uid: user.uid,
+          email: user.email || (isEmail(target) ? target : null),
+          displayName: user.displayName || null,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+  }
+
+  await writeAuditLog({
+    adminUid: 'cli:set-admin',
+    action: remove ? 'admin.revoke' : 'admin.grant',
+    targetType: 'user',
+    targetId: user.uid,
+    details: { email: user.email || null, via: 'scripts/set-admin.js' }
+  });
+
+  const label = user.email || user.uid;
+
+  if (remove) {
+    console.log(`[set-admin] Admin access removed for ${label}.`);
+    console.log('[set-admin] Sign out and sign in again (or refresh the ID token) so the claim is dropped.');
+  } else {
+    console.log(`[set-admin] ${label} is now an administrator (custom claim: admin=true).`);
+    console.log('[set-admin] The client reads this from getIdTokenResult().');
+    console.log('[set-admin] Sign out and sign in again (or refresh the ID token) so the new claim applies.');
+    console.log('[set-admin] Then open /admin.');
+  }
+
   process.exit(0);
 }
 

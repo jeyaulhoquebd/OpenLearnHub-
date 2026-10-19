@@ -95,3 +95,8 @@ export function testAiKey({ apiKey, model }, token) {
 export function getApiHealth() {
   return apiRequest('/api/health');
 }
+
+/** GET /api/admin/me — confirms the admin claim server-side. */
+export function getAdminMe(token, signal) {
+  return apiRequest('/api/admin/me', { token, signal });
+}

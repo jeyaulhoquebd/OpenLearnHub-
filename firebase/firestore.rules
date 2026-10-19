@@ -9,13 +9,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.admin == true ||
-        (
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-        )
-      );
+      // Administrator status comes exclusively from the `admin: true` custom
+      // claim, set with server/scripts/set-admin.js. It is never read from a
+      // Firestore field, so a user can never promote themselves.
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     function isOwner(userId) {
@@ -32,13 +29,15 @@ service cloud.firestore {
     }
 
     // ---------- resources ----------
-    // Published resources are public. Pending/rejected resources are visible
-    // only to their submitter and to admins. Only admins may publish, edit,
-    // feature, or delete a listing. Reports about resources live in /reports.
+    // Anyone can read published listings. Administrators (custom claim
+    // `admin: true`) can read every listing regardless of status, which is what
+    // the admin panel needs for drafts, pending submissions, and flagged items.
+    // Submitters can still see their own pending/rejected entry. Only admins
+    // may publish, edit, feature, or delete a listing.
     match /resources/{resourceId} {
       allow read: if
-        (resource.data.status == 'published') ||
         isAdmin() ||
+        (resource.data.status == 'published') ||
         (isSignedIn() && resource.data.createdBy == request.auth.uid);
 
       allow create: if
@@ -189,6 +188,14 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if false;
       allow update, delete: if isAdmin();
+    }
+
+    // ---------- audit trail (server-only) ----------
+    // Admin actions are appended by the Express API with the Admin SDK. The
+    // collection is never readable or writable from a browser — not even for
+    // administrators — because the Admin SDK bypasses these rules.
+    match /auditLogs/{entryId} {
+      allow read, write: if false;
     }
 
     // ---------- server-only settings ----------
