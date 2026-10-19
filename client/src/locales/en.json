@@ -34,7 +34,8 @@
     "dismiss": "Dismiss notification",
     "theme": "Theme",
     "switchToDark": "Switch to dark mode",
-    "switchToLight": "Switch to light mode"
+    "switchToLight": "Switch to light mode",
+    "skipToContent": "Skip to content"
   },
   "type": {
     "course": "Course",
@@ -58,7 +59,9 @@
     "login": "Sign in",
     "signup": "Join free",
     "menu": "Menu",
-    "language": "Language"
+    "language": "Language",
+    "primary": "Primary",
+    "mobile": "Mobile"
   },
   "home": {
     "badge": "Curated · legal · always free",
@@ -104,7 +107,9 @@
     "ctaTitle": "Know a resource we should add?",
     "ctaText": "Help another learner discover something legal, free, and genuinely useful. Community submissions are reviewed before publishing.",
     "ctaButton": "Submit a resource",
-    "browseLibrary": "Browse the library"
+    "browseLibrary": "Browse the library",
+    "sourcesTitle": "Sources we trust",
+    "moreToExplore": "More to explore"
   },
   "explore": {
     "eyebrow": "The library",
@@ -133,7 +138,8 @@
     "loading": "Loading the library…",
     "errorTitle": "We couldn't load the library",
     "errorText": "Check your connection and try again.",
-    "resultsTitle": "Resources"
+    "resultsTitle": "Resources",
+    "breadcrumb": "Breadcrumb"
   },
   "filters": {
     "allCategories": "All subjects",
@@ -286,7 +292,9 @@
     "validationCountries": "Select at least one region.",
     "validationLanguages": "Select at least one language.",
     "optional": "Optional",
-    "previewNote": "Submissions are not public until a moderator approves them."
+    "previewNote": "Submissions are not public until a moderator approves them.",
+    "detailsTitle": "Resource details",
+    "chooseImage": "Choose an image"
   },
   "dashboard": {
     "eyebrow": "Your learning space",

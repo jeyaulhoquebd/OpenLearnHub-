@@ -29,7 +29,7 @@ export default function ResourceCard({ resource, compact = false }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className={`chip ${meta.chip}`}>{t(meta.labelKey)}</span>
             {resource.featured && (
-              <span className="chip bg-accent-500/10 text-accent-700 ring-accent-400/30">
+              <span className="chip bg-accent-500/10 text-accent-700 ring-accent-400/30 dark:text-accent-200">
                 <Sparkles className="h-3 w-3" />
                 {t('common.verified')}
               </span>

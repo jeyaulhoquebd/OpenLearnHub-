@@ -168,7 +168,7 @@ export default function HomePage() {
                         <span
                           key={code}
                           className={`grid h-9 w-9 place-items-center rounded-full border-2 border-navy-800 text-[10px] font-bold text-white ${
-                            index === 0 ? 'bg-accent-500' : index === 1 ? 'bg-amber-500' : 'bg-navy-400 text-brand-950'
+                            index === 0 ? 'bg-accent-500' : index === 1 ? 'bg-amber-500 text-navy-950' : 'bg-navy-400 text-navy-950'
                           }`}
                         >
                           {code}
@@ -269,7 +269,7 @@ export default function HomePage() {
 
       <section className="border-y border-sand-200 bg-white/60 dark:bg-white/5">
         <div className="container-page flex flex-wrap items-center justify-center gap-x-8 gap-y-3 py-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-muted">Sources we trust</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-muted">{t('home.sourcesTitle')}</p>
           {['Harvard', 'MIT OCW', 'Khan Academy', 'freeCodeCamp', 'OpenStax', 'NPTEL', 'Blender'].map((name) => (
             <span key={name} className="font-display text-sm font-semibold text-ink-soft/80">
               {name}
@@ -353,7 +353,7 @@ export default function HomePage() {
 
           {related.length > 0 && (
             <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-sand-200 bg-sand-50 px-5 py-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">More to explore</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">{t('home.moreToExplore')}</p>
               {related.map((resource) => (
                 <Link
                   key={resource.id}

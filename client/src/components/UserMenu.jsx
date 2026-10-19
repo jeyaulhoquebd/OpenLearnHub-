@@ -46,7 +46,16 @@ export default function UserMenu() {
         aria-expanded={open}
       >
         {photoURL ? (
-          <img src={photoURL} alt="" className="h-8 w-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+          <img
+            src={photoURL}
+            alt=""
+            width={32}
+            height={32}
+            loading="lazy"
+            decoding="async"
+            className="h-8 w-8 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
         ) : (
           <span className="grid h-8 w-8 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white">
             {initials(displayName)}

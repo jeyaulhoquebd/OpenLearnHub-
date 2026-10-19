@@ -83,7 +83,7 @@ export default function LegalLayout({ title, subtitle, children }) {
 
           <article className="prose-legal max-w-3xl">
             {children}
-            <p className="mt-10 rounded-2xl border border-sand-200 bg-sand-100/70 px-5 py-4 text-xs leading-relaxed text-ink-muted">
+            <p className="mt-10 rounded-2xl border border-sand-200 bg-sand-100/70 px-5 py-4 text-xs leading-relaxed text-ink-soft">
               {t('legal.englishOnly')}
             </p>
           </article>

@@ -54,12 +54,12 @@ export default function Header() {
         href="#main"
         className="absolute -top-16 start-4 z-[60] rounded-full bg-navy-900 px-4 py-2 text-xs font-semibold text-white transition focus:top-3"
       >
-        Skip to content
+        {t('common.skipToContent')}
       </a>
       <div className="container-page flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
         <Logo />
 
-        <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-0.5 xl:flex" aria-label={t('nav.primary')}>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={linkClass}>
               {item.label}
@@ -93,7 +93,9 @@ export default function Header() {
 
         <div className="flex items-center gap-2 xl:hidden">
           <ThemeToggle />
-          <LanguageSwitcher compact />
+          <div className="hidden sm:block">
+            <LanguageSwitcher compact />
+          </div>
           {user && <UserMenu />}
           <button
             type="button"
@@ -110,7 +112,7 @@ export default function Header() {
 
       {open && (
         <div id="mobile-menu" className="border-t border-sand-200 bg-surface xl:hidden">
-          <nav className="container-page flex flex-col gap-1 py-4" aria-label="Mobile">
+          <nav className="container-page flex flex-col gap-1 py-4" aria-label={t('nav.mobile')}>
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -147,6 +149,10 @@ export default function Header() {
                   </Link>
                 </>
               )}
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-sand-100 pt-4 sm:hidden">
+              <LanguageSwitcher />
+              <ThemeToggle />
             </div>
           </nav>
         </div>

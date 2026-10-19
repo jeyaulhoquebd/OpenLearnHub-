@@ -291,7 +291,7 @@ export default function SubmitResourcePage() {
             </div>
 
             <div className="card space-y-5 p-6 sm:p-8">
-              <h2 className="font-display text-xl font-semibold text-ink">Resource details</h2>
+              <h2 className="font-display text-xl font-semibold text-ink">{t('submit.detailsTitle')}</h2>
 
               <Field label={t('submit.titleLabel')} htmlFor="resource-title" required>
                 <input
@@ -543,7 +543,7 @@ export default function SubmitResourcePage() {
                 />
                 {thumbnailPreview ? (
                   <div className="relative overflow-hidden rounded-2xl border border-sand-200">
-                    <img src={thumbnailPreview} alt="" className="h-40 w-full object-cover" />
+                    <img src={thumbnailPreview} alt="" decoding="async" className="h-40 w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => {
@@ -565,7 +565,7 @@ export default function SubmitResourcePage() {
                     <span className="grid h-10 w-10 place-items-center rounded-xl bg-surface text-brand-700 shadow-sm">
                       <Upload className="h-4 w-4" />
                     </span>
-                    <span className="text-sm font-semibold text-ink">Choose an image</span>
+                    <span className="text-sm font-semibold text-ink">{t('submit.chooseImage')}</span>
                     <span className="text-xs text-ink-muted">JPG, PNG, WebP · max 2 MB</span>
                   </button>
                 )}

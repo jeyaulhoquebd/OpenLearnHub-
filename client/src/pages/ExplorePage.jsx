@@ -115,7 +115,7 @@ export default function ExplorePage({ fixedType = null }) {
         <div className="pointer-events-none absolute -end-24 -top-28 h-80 w-80 rounded-full bg-brand-100/70 blur-3xl" />
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.28]" />
         <div className="container-page relative">
-          <nav className="flex items-center gap-2 text-xs font-medium text-ink-muted" aria-label="Breadcrumb">
+          <nav className="flex items-center gap-2 text-xs font-medium text-ink-muted" aria-label={t('explore.breadcrumb')}>
             <Link to="/" className="hover:text-brand-800">
               {t('common.home')}
             </Link>

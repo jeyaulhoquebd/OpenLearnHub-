@@ -39,7 +39,8 @@ OpenLearn Hub lists free courses, lawfully available books (open textbooks, publ
 - **Admin dashboard** for approving/rejecting submissions and resolving reports.
 - **Report this resource** on every card and detail page for copyright, piracy, broken-link, and accuracy issues.
 - **LearnMate**, an AI study guide whose key lives only on the server and which is grounded in the curated library.
-- **Four languages** — English, Bangla, Hindi, and Urdu (RTL).
+- **Three languages** — English, Bangla, and Urdu (RTL). Hindi can be added later without restructuring.
+- **Light and dark mode** with a navbar toggle that follows the system preference until you choose one, then remembers it.
 
 ## Content and legal policy
 
@@ -470,10 +471,17 @@ Admin access requires either the `admin` custom claim or `users/{uid}.role === "
 
 ## Translations and RTL
 
-- Locales live in `client/src/locales/{en,bn,hi,ur}.json`.
+- Locales live in `client/src/locales/{en,bn,ur}.json`.
 - The switcher stores the choice in `localStorage` under `openlearn.language`.
 - Urdu sets `<html lang="ur" dir="rtl">` and a `lang-urdu` body class; layouts use logical properties (`ms-*`, `me-*`, `start-*`, `end-*`) so they mirror correctly.
-- To add a language: add the JSON file, register it in `client/src/lib/i18n.js`, and add it to the `supported` array and the switcher.
+- To add a language: add the JSON file, register it in `client/src/lib/i18n.js`, and add it to `SUPPORTED_LANGUAGES` (used by the switcher). Resource titles/descriptions may be strings or `{ en, bn, ur }` maps; `localized()` in `client/src/lib/utils.js` resolves either shape and falls back to English.
+
+## Design system
+
+- Brand navy `#0B1F4B`, white surfaces, and electric purple `#7C3AED` accents. Tokens live in `client/tailwind.config.js`.
+- Theme-aware neutrals (`sand`, `ink`, `surface`, `brand`) are CSS variables defined in `client/src/index.css`; switching the `dark` class on `<html>` recolours the app without per-component overrides.
+- Fonts: Inter (English/UI), Noto Sans Bengali (Bangla), Noto Nastaliq Urdu (Urdu).
+- The theme choice is stored under `openlearn.theme`; an inline script in `client/index.html` applies it before first paint to avoid a flash.
 
 ## Scripts
 

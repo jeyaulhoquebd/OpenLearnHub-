@@ -24,8 +24,10 @@ export function applyDocumentLanguage(language) {
   const lang = supported.includes(language) ? language : 'en';
   document.documentElement.lang = lang;
   document.documentElement.dir = rtlLanguages.has(lang) ? 'rtl' : 'ltr';
-  document.body.classList.toggle('lang-urdu', lang === 'ur');
-  document.body.classList.toggle('lang-bangla', lang === 'bn');
+  if (document.body) {
+    document.body.classList.toggle('lang-urdu', lang === 'ur');
+    document.body.classList.toggle('lang-bangla', lang === 'bn');
+  }
   window.localStorage.setItem('openlearn.language', lang);
 }
 
