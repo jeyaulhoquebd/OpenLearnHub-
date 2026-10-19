@@ -78,7 +78,7 @@ const server = app.listen(config.port, () => {
   console.log(
     `[server] OpenLearn Hub API listening on port ${config.port} (${config.nodeEnv}) · Firebase Admin: ${
       isFirebaseReady() ? 'ready' : 'not configured'
-    } · LearnMate: ${config.llm.apiKey ? 'configured' : 'not configured'}`
+    } · LearnMate: ${config.gemini.apiKey ? 'configured' : 'not configured'}`
   );
 });
 

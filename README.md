@@ -232,17 +232,16 @@ npm run dev
 
 ## LearnMate AI setup
 
-LearnMate is optional. Without a key, `/api/ai/chat` returns a clear `503` and the UI explains that the assistant is not configured.
+LearnMate uses the Google Gemini API through the official `@google/genai` package, called only from the Express server. Without a key, `/api/ai/chat` returns a clear `503` and the UI explains that the assistant is not configured.
 
-1. Pick a provider with an OpenAI-compatible chat-completions API (OpenAI, Groq, Together, OpenRouter, a self-hosted gateway, etc.).
+1. Create an API key at [Google AI Studio](https://aistudio.google.com/apikey).
 2. Put the key **only** in `server/.env`:
 
 ```dotenv
-LLM_API_KEY=sk-...
-LLM_API_URL=https://api.openai.com/v1/chat/completions
-LLM_MODEL=gpt-4o-mini
-LLM_TIMEOUT_MS=30000
-LLM_MAX_OUTPUT_TOKENS=700
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_TIMEOUT_MS=30000
+GEMINI_MAX_OUTPUT_TOKENS=1024
 ```
 
 3. Restart the API.
@@ -251,8 +250,8 @@ How it behaves:
 
 - Requires a valid Firebase ID token (`Authorization: Bearer <token>`).
 - Rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour).
-- Retrieves matching resources from the local seed/Firestore and passes them to the model, then returns `reply` plus `sources`.
-- The key never reaches the browser; there is no `VITE_LLM_*` variable.
+- Retrieves matching resources from the curated library (Firestore) and passes them to the model as grounded context, then returns `reply` plus `sources`.
+- The key never reaches the browser; there is no `VITE_GEMINI_*` variable.
 
 ## Environment variables
 
@@ -266,13 +265,14 @@ How it behaves:
 | `VITE_FIREBASE_STORAGE_BUCKET` | For Firebase | Storage bucket |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | For Firebase | Sender ID |
 | `VITE_FIREBASE_APP_ID` | For Firebase | Web app ID |
+| `VITE_FIREBASE_MEASUREMENT_ID` | No | Enables Analytics in production builds only |
 | `VITE_API_URL` | Production | Full API origin, e.g. `https://openlearn-api.onrender.com`. Empty means relative `/api` (works with the dev proxy). |
 | `VITE_USE_FIREBASE_EMULATOR` | No | `true` to connect to local emulators |
 | `VITE_CONTACT_EMAIL` | No | Public contact address |
 | `VITE_LEGAL_EMAIL` | No | Address for copyright notices |
 | `VITE_SITE_URL` | No | Canonical site URL |
 
-Leaving all six Firebase values empty is supported and enables preview mode.
+Leaving the six required Firebase values empty is supported and enables preview mode.
 
 ### Server (`server/.env`)
 
@@ -282,15 +282,16 @@ Leaving all six Firebase values empty is supported and enables preview mode.
 | `PORT` | No | Default `8080` (Render supplies its own) |
 | `CLIENT_ORIGIN` | Production | Comma-separated allowed browser origins. Never `*`. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | One auth option | Service-account JSON on one line |
-| `GOOGLE_APPLICATION_CREDENTIALS` | One auth option | Path to a service-account file |
-| `FIREBASE_PROJECT_ID` | No | Explicit project ID for ADC |
+| `FIREBASE_PROJECT_ID` | One auth option | With the two values below, for the three-variable credential |
+| `FIREBASE_CLIENT_EMAIL` | One auth option | `client_email` from the service account |
+| `FIREBASE_PRIVATE_KEY` | One auth option | `private_key` (keep the `\n` escapes) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | One auth option | Path to a service-account file (local dev / ADC) |
 | `FIREBASE_STORAGE_BUCKET` | No | Explicit storage bucket |
 | `ADMIN_EMAILS` | Recommended | Default admin email(s) for `set-admin` |
-| `LLM_API_KEY` | For LearnMate | Server-side secret |
-| `LLM_API_URL` | For LearnMate | OpenAI-compatible endpoint |
-| `LLM_MODEL` | For LearnMate | Model name |
-| `LLM_TIMEOUT_MS` | No | Default `30000` |
-| `LLM_MAX_OUTPUT_TOKENS` | No | Default `700` |
+| `GEMINI_API_KEY` | For LearnMate | Server-side Gemini key |
+| `GEMINI_MODEL` | No | Default `gemini-2.5-flash` |
+| `GEMINI_TIMEOUT_MS` | No | Default `30000` |
+| `GEMINI_MAX_OUTPUT_TOKENS` | No | Default `1024` |
 | `REPORT_RATE_LIMIT_PER_HOUR` | No | Default `12` |
 | `AI_RATE_LIMIT_PER_HOUR` | No | Default `25` |
 | `GLOBAL_RATE_LIMIT_PER_15_MIN` | No | Default `400` |

@@ -34,12 +34,12 @@ const aiLimiter = rateLimit({
 
 aiRouter.post('/chat', requireAuth, aiLimiter, async (req, res, next) => {
   try {
-    if (!config.llm.apiKey) {
+    if (!config.gemini.apiKey) {
       return apiError(
         res,
         503,
         'llm_unavailable',
-        'LearnMate is not configured yet. An administrator needs to set LLM_API_KEY on the server.'
+        'LearnMate is not configured yet. An administrator needs to set GEMINI_API_KEY on the server.'
       );
     }
 
@@ -54,17 +54,20 @@ aiRouter.post('/chat', requireAuth, aiLimiter, async (req, res, next) => {
       return apiError(res, 400, 'invalid_chat', 'A user message is required.');
     }
 
-    const sources = await findRelevantResources(lastUserMessage.content);
+    const sources = await findRelevantResources(lastUserMessage.content, locale);
 
     let reply;
     try {
       reply = await generateLearnMateReply({ messages, sources, locale });
     } catch (error) {
+      if (error.code === 'llm_unavailable') {
+        return apiError(res, 503, 'llm_unavailable', 'LearnMate is not configured yet.');
+      }
       if (error.code === 'llm_timeout') {
         return apiError(res, 504, 'llm_timeout', 'The AI provider took too long to respond. Please try again.');
       }
-      if (error.code === 'llm_unreachable') {
-        return apiError(res, 502, 'llm_unreachable', 'Could not reach the AI provider. Please try again.');
+      if (error.code === 'llm_rate_limited') {
+        return apiError(res, 429, 'llm_rate_limited', 'The AI provider is rate-limiting requests. Please try again shortly.');
       }
       return apiError(res, 502, 'llm_error', 'The AI provider could not generate a response right now.');
     }

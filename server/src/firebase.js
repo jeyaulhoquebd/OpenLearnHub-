@@ -10,18 +10,37 @@ let storage = null;
 let initialized = false;
 let initError = null;
 
+// `.env` files usually store the private key with literal "\n" escapes.
+function normalizePrivateKey(value = '') {
+  return value.includes('\\n') ? value.replace(/\\n/g, '\n') : value;
+}
+
 function buildCredential() {
-  if (config.firebase.serviceAccountJson) {
+  const { serviceAccountJson, projectId, clientEmail, privateKey } = config.firebase;
+
+  // Option A — full service-account JSON (one line, escaped newlines).
+  if (serviceAccountJson) {
     try {
-      const raw = config.firebase.serviceAccountJson.trim();
-      const parsed = JSON.parse(raw.replace(/\\n/g, '\n'));
-      if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+      const parsed = JSON.parse(normalizePrivateKey(serviceAccountJson.trim()));
+      if (parsed.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key);
       return cert(parsed);
     } catch (error) {
       console.error('[firebase] FIREBASE_SERVICE_ACCOUNT_JSON could not be parsed:', error.message);
       return null;
     }
   }
+
+  // Option B — discrete project id, client email, and private key.
+  if (projectId && clientEmail && privateKey) {
+    return cert({
+      projectId,
+      clientEmail,
+      privateKey: normalizePrivateKey(privateKey)
+    });
+  }
+
+  // Option C — Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS
+  // or the runtime's attached service account).
   return applicationDefault();
 }
 

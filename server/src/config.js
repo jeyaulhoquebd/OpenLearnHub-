@@ -24,17 +24,21 @@ export const config = {
   port: parseNumber(process.env.PORT, 8080),
   clientOrigins,
   firebase: {
+    // Credential option A: full service-account JSON on one line.
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
+    // Credential option B: three discrete values.
     projectId: process.env.FIREBASE_PROJECT_ID || '',
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+    privateKey: process.env.FIREBASE_PRIVATE_KEY || '',
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
     adminEmails: parseList(process.env.ADMIN_EMAILS).map((email) => email.toLowerCase())
   },
-  llm: {
-    apiKey: process.env.LLM_API_KEY || '',
-    apiUrl: process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions',
-    model: process.env.LLM_MODEL || 'gpt-4o-mini',
-    timeoutMs: parseNumber(process.env.LLM_TIMEOUT_MS, 30000),
-    maxOutputTokens: parseNumber(process.env.LLM_MAX_OUTPUT_TOKENS, 700)
+  // Google Gemini — server-side only. The key must never reach the browser.
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    timeoutMs: parseNumber(process.env.GEMINI_TIMEOUT_MS, 30000),
+    maxOutputTokens: parseNumber(process.env.GEMINI_MAX_OUTPUT_TOKENS, 1024)
   },
   limits: {
     reportsPerHour: parseNumber(process.env.REPORT_RATE_LIMIT_PER_HOUR, 12),
@@ -45,16 +49,26 @@ export const config = {
 
 export function assertProductionConfig() {
   const warnings = [];
-  if (config.isProduction && !config.llm.apiKey) {
-    warnings.push('LLM_API_KEY is not set — LearnMate will return 503 until configured.');
+  const { firebase } = config;
+
+  if (config.isProduction && !config.gemini.apiKey) {
+    warnings.push('GEMINI_API_KEY is not set — the AI assistant will return 503 until configured.');
   }
-  if (!config.firebase.serviceAccountJson && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !config.firebase.projectId) {
+
+  const hasCredential =
+    firebase.serviceAccountJson ||
+    (firebase.projectId && firebase.clientEmail && firebase.privateKey) ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  if (!hasCredential) {
     warnings.push(
-      'No Firebase credentials detected. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS so reports and AI auth work.'
+      'No Firebase credentials detected. Set FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, or GOOGLE_APPLICATION_CREDENTIALS.'
     );
   }
+
   if (config.isProduction && config.clientOrigins.includes('*')) {
     warnings.push('CLIENT_ORIGIN must not be "*" in production.');
   }
+
   warnings.forEach((warning) => console.warn(`[config] ${warning}`));
 }

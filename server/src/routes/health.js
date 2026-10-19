@@ -13,7 +13,7 @@ healthRouter.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       firebaseAdmin: isFirebaseReady(),
-      learnMateConfigured: Boolean(config.llm.apiKey)
+      geminiConfigured: Boolean(config.gemini.apiKey)
     }
   });
 });
