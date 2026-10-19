@@ -63,6 +63,35 @@ export function askLearnMate({ messages, locale, token, signal }) {
   });
 }
 
+export function generateRoadmap({ goal, level, language, token, signal }) {
+  return apiRequest('/api/ai/roadmap', {
+    method: 'POST',
+    body: { goal, level, language },
+    token,
+    signal
+  });
+}
+
+export function getAiSettingsStatus(token) {
+  return apiRequest('/api/admin/settings/ai/status', { token });
+}
+
+export function saveAiSettings({ apiKey, model }, token) {
+  return apiRequest('/api/admin/settings/ai', {
+    method: 'POST',
+    body: { apiKey, model },
+    token
+  });
+}
+
+export function testAiKey({ apiKey, model }, token) {
+  return apiRequest('/api/admin/settings/ai/test', {
+    method: 'POST',
+    body: { apiKey, model },
+    token
+  });
+}
+
 export function getApiHealth() {
   return apiRequest('/api/health');
 }

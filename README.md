@@ -108,9 +108,9 @@ There are **no Cloud Functions**. The API is a normal Express service so it can 
 │   └── vite.config.js
 ├── server/                 Express API
 │   ├── src/
-│   │   ├── routes/         /api/health, /api/reports, /api/ai
-│   │   ├── middleware/     Firebase ID-token verification
-│   │   ├── lib/            AI grounding + HTTP helpers
+│   │   ├── routes/         /api/health, /api/reports, /api/ai, /api/admin
+│   │   ├── middleware/     Firebase ID-token verification, admin claim guard
+│   │   ├── lib/            AI grounding, encrypted settings, quotas, HTTP helpers
 │   │   ├── config.js
 │   │   ├── firebase.js
 │   │   └── index.js
@@ -247,26 +247,39 @@ npm run dev
 
 ## LearnMate AI setup
 
-LearnMate uses the Google Gemini API through the official `@google/genai` package, called only from the Express server. Without a key, `/api/ai/chat` returns a clear `503` and the UI explains that the assistant is not configured.
+LearnMate uses the Google Gemini API through the official `@google/genai` package, called only from the Express server. Without a key, `/api/ai/chat` and `/api/ai/roadmap` return a clear `503` and the UI explains that the assistant is not configured.
 
-1. Create an API key at [Google AI Studio](https://aistudio.google.com/apikey).
-2. Put the key **only** in `server/.env`:
+There are **two ways** to provide the key. The stored (admin-panel) key always wins:
+
+1. **Server environment (simplest).** Put the key **only** in `server/.env`:
 
 ```dotenv
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_TIMEOUT_MS=30000
 GEMINI_MAX_OUTPUT_TOKENS=1024
+GEMINI_ROADMAP_MAX_OUTPUT_TOKENS=2048
 ```
 
-3. Restart the API.
+2. **Admin panel (no redeploy).** Sign in as an admin, open **Admin → AI settings** (`/admin/ai`), paste the key there. The server encrypts it with AES-256-GCM using `SETTINGS_ENCRYPTION_KEY` and stores it in the server-only `settings/ai` document:
+
+```dotenv
+# Generate with: openssl rand -hex 32
+SETTINGS_ENCRYPTION_KEY=your-64-hex-char-secret
+```
+
+Rotating `SETTINGS_ENCRYPTION_KEY` makes previously stored keys undecryptable — open the admin page and save the key again afterwards.
 
 How it behaves:
 
-- Requires a valid Firebase ID token (`Authorization: Bearer <token>`).
-- Rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour).
-- Retrieves matching resources from the curated library (Firestore) and passes them to the model as grounded context, then returns `reply` plus `sources`.
-- The key never reaches the browser; there is no `VITE_GEMINI_*` variable.
+- Requires a valid Firebase ID token (`Authorization: Bearer <token>`). Roadmaps additionally require a **verified email**.
+- Resolution order: Firestore `settings/ai` → `GEMINI_API_KEY`. If neither is set, the API returns `503 llm_unavailable`.
+- Chat is rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour); roadmaps have both an hourly limit (`ROADMAP_RATE_LIMIT_PER_HOUR`, default 10) and a daily quota (`ROADMAP_DAILY_QUOTA`, default 20, counted in `aiUsage/{uid}_{YYYY-MM-DD}`).
+- Retrieves matching resources from the curated library (Firestore) and passes them to the model as grounded context, so the model can only cite resources that actually exist.
+- `POST /api/ai/chat` returns a free-form `reply` plus `sources`.
+- `POST /api/ai/roadmap` returns a validated JSON plan (`title`, `summary`, `steps[]`) whose step ids are mapped back to real resources; unknown ids are discarded.
+- The model is instructed to treat user text as data, not instructions, to resist prompt-injection.
+- The key never reaches the browser; there is no `VITE_GEMINI_*` variable, and `settings/*` is unreadable from clients by rule.
 
 ## Environment variables
 
@@ -303,12 +316,16 @@ Leaving the six required Firebase values empty is supported and enables preview 
 | `GOOGLE_APPLICATION_CREDENTIALS` | One auth option | Path to a service-account file (local dev / ADC) |
 | `FIREBASE_STORAGE_BUCKET` | No | Explicit storage bucket |
 | `ADMIN_EMAILS` | Recommended | Default admin email(s) for `set-admin` |
-| `GEMINI_API_KEY` | For LearnMate | Server-side Gemini key |
+| `GEMINI_API_KEY` | For LearnMate | Server-side Gemini key (fallback when none is stored) |
 | `GEMINI_MODEL` | No | Default `gemini-2.5-flash` |
 | `GEMINI_TIMEOUT_MS` | No | Default `30000` |
 | `GEMINI_MAX_OUTPUT_TOKENS` | No | Default `1024` |
+| `GEMINI_ROADMAP_MAX_OUTPUT_TOKENS` | No | Default `2048` |
+| `SETTINGS_ENCRYPTION_KEY` | For admin AI settings | AES-256-GCM key (`openssl rand -hex 32`) that encrypts the key stored in `settings/ai` |
 | `REPORT_RATE_LIMIT_PER_HOUR` | No | Default `12` |
 | `AI_RATE_LIMIT_PER_HOUR` | No | Default `25` |
+| `ROADMAP_RATE_LIMIT_PER_HOUR` | No | Default `10` |
+| `ROADMAP_DAILY_QUOTA` | No | Default `20` |
 | `GLOBAL_RATE_LIMIT_PER_15_MIN` | No | Default `400` |
 
 ## Data model and security rules
@@ -375,6 +392,8 @@ data keeps rendering during the migration.
 | `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
 | `reviews/{resourceId_userId}` | public | verified, signed-in owner (one review per resource) |
 | `reports/{id}` | admins | **created by the Express API only** |
+| `roadmaps/{id}` | owner | owner (bounded content, no updates) |
+| `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; daily AI quota) |
 | `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
 
 `categories` seed data lives in `firebase/seed/categories.json` and
@@ -387,6 +406,24 @@ data keeps rendering during the migration.
 - **Writes are disabled for clients** (`allow create: if false`). Reports are created by the Express API using the Admin SDK, which validates the payload and bypasses rules. This prevents spam and forged reports.
 - Signed-in reporters must have a verified email; anonymous copyright notices are still accepted and stored with `verifiedReporter: false`.
 
+### `settings/ai` (server-only)
+
+Written exclusively by the Express API through the Admin SDK. Clients are denied all access by rule.
+
+```jsonc
+{
+  "provider": "gemini",
+  "model": "gemini-2.5-flash",
+  "apiKeyCiphertext": "…", // AES-256-GCM, base64
+  "apiKeyIv": "…",
+  "apiKeyTag": "…",
+  "apiKeyPrefix": "AIza",  // for the masked hint only
+  "apiKeySuffix": "1234",
+  "updatedAt": "<timestamp>",
+  "updatedBy": "<admin uid>"
+}
+```
+
 ### Rules summary
 
 - Published resources: public read.
@@ -395,6 +432,7 @@ data keeps rendering during the migration.
 - Resource update/delete, categories, alternatives: admins only.
 - Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
 - Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`.
+- Roadmaps: owner-only read/delete; create limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps).
 - Reviews: verified email required, one per resource, owner-only edits.
 - `settings/*`: completely denied to clients (the server's Admin SDK writes it).
 - Storage: images under 2 MB, thumbnail paths only; admins may write anywhere.
@@ -410,6 +448,10 @@ Base URL: `http://localhost:8080` in development.
 | `GET` | `/api/health` | No | Health + Firebase/LLM configuration flags |
 | `POST` | `/api/reports` | Optional Firebase ID token | Create a report about a resource (IP rate-limited) |
 | `POST` | `/api/ai/chat` | Firebase ID token | LearnMate reply grounded in curated resources |
+| `POST` | `/api/ai/roadmap` | Firebase ID token + verified email | Structured study roadmap grounded in curated resources (hourly + daily limits) |
+| `GET` | `/api/admin/settings/ai/status` | Admin claim | Masked AI configuration status (never returns the key) |
+| `POST` | `/api/admin/settings/ai` | Admin claim | Store/clear the encrypted Gemini key + model |
+| `POST` | `/api/admin/settings/ai/test` | Admin claim | Verify a candidate or active key with a minimal Gemini call |
 
 ### `POST /api/reports`
 
@@ -443,6 +485,44 @@ Response:
   "sources": [{ "id": "python", "title": "Python", "url": "https://…", "type": "software" }]
 }
 ```
+
+### `POST /api/ai/roadmap`
+
+```json
+{
+  "goal": "Become a front-end developer",
+  "level": "beginner | intermediate | advanced",
+  "language": "en | bn | ur"
+}
+```
+
+Response (step `resources` always come from the curated library):
+
+```json
+{
+  "goal": "Become a front-end developer",
+  "level": "beginner",
+  "language": "en",
+  "title": "Your front-end path",
+  "summary": "…",
+  "steps": [
+    {
+      "order": 1,
+      "title": "Learn HTML & CSS",
+      "description": "…",
+      "estimatedWeeks": 3,
+      "resources": [{ "id": "freecodecamp-web", "title": "…", "url": "https://…", "type": "course" }]
+    }
+  ],
+  "sources": []
+}
+```
+
+### Admin AI settings
+
+`GET /api/admin/settings/ai/status` returns `{ configured, source, model, hasStoredKey, keyHint, encryptionAvailable, updatedAt, updatedBy }` — the API key itself is never returned. `POST /api/admin/settings/ai` accepts `{ apiKey, model }`; an empty `apiKey` clears the stored key. `POST /api/admin/settings/ai/test` accepts the same fields and verifies the key (falling back to the active key when `apiKey` is empty).
+
+Saved roadmaps are written by the **client** to the `roadmaps` collection (owner-only rules), not through the API.
 
 Errors use a consistent shape: `{ "error": { "code": "…", "message": "…" } }`.
 

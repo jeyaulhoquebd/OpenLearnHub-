@@ -35,9 +35,19 @@ services:
         value: "30000"
       - key: GEMINI_MAX_OUTPUT_TOKENS
         value: "1024"
+      - key: GEMINI_ROADMAP_MAX_OUTPUT_TOKENS
+        value: "2048"
+      # AES-256-GCM key for secrets stored in Firestore settings/ai.
+      # Generate with: openssl rand -hex 32
+      - key: SETTINGS_ENCRYPTION_KEY
+        sync: false
       - key: REPORT_RATE_LIMIT_PER_HOUR
         value: "12"
       - key: AI_RATE_LIMIT_PER_HOUR
         value: "25"
+      - key: ROADMAP_RATE_LIMIT_PER_HOUR
+        value: "10"
+      - key: ROADMAP_DAILY_QUOTA
+        value: "20"
       - key: GLOBAL_RATE_LIMIT_PER_15_MIN
         value: "400"

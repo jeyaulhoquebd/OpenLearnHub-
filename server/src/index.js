@@ -8,6 +8,7 @@ import { initFirebase, isFirebaseReady } from './firebase.js';
 import { healthRouter } from './routes/health.js';
 import { reportsRouter } from './routes/reports.js';
 import { aiRouter } from './routes/ai.js';
+import { adminRouter } from './routes/admin.js';
 import { errorHandler, notFoundHandler } from './lib/http.js';
 
 initFirebase();
@@ -62,7 +63,13 @@ app.get('/', (req, res) => {
     name: 'OpenLearn Hub API',
     tagline: 'Knowledge for Everyone',
     documentation: '/api/health',
-    routes: ['/api/health', '/api/reports', '/api/ai/chat']
+    routes: [
+      '/api/health',
+      '/api/reports',
+      '/api/ai/chat',
+      '/api/ai/roadmap',
+      '/api/admin/settings/ai/status'
+    ]
   });
 });
 
@@ -70,6 +77,7 @@ app.use('/api', globalLimiter);
 app.use('/api/health', healthRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/admin', adminRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

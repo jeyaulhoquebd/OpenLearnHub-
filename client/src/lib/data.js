@@ -10,7 +10,8 @@ import {
   setDoc,
   updateDoc,
   where,
-  deleteDoc
+  deleteDoc,
+  addDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import seedData from '../../../firebase/seed/resources.json';
@@ -362,6 +363,64 @@ export function summarizeReviews(reviews = []) {
     count: reviews.length,
     distribution
   };
+}
+
+// ---------------------------------------------------------------------------
+// Saved AI roadmaps (top-level collection, owner-scoped)
+// ---------------------------------------------------------------------------
+
+/** Trims a roadmap step to the plain shape Firestore accepts (no undefined). */
+function toStoredRoadmapStep(step = {}) {
+  return {
+    order: Number(step.order) || 0,
+    title: String(step.title || '').slice(0, 200),
+    description: String(step.description || '').slice(0, 1500),
+    estimatedWeeks:
+      Number.isFinite(Number(step.estimatedWeeks)) && Number(step.estimatedWeeks) >= 0
+        ? Math.round(Number(step.estimatedWeeks))
+        : null,
+    resourceIds: (step.resources || [])
+      .map((resource) => resource?.id)
+      .filter(Boolean)
+      .slice(0, 6)
+  };
+}
+
+export async function saveRoadmap(uid, roadmap) {
+  if (!db || !uid) throw new Error('Sign in to save a roadmap.');
+  const steps = Array.isArray(roadmap?.steps) ? roadmap.steps.slice(0, 20) : [];
+  const ref = await addDoc(collection(db, 'roadmaps'), {
+    userId: uid,
+    goal: String(roadmap?.goal || '').slice(0, 300),
+    level: String(roadmap?.level || 'beginner').slice(0, 20),
+    language: String(roadmap?.language || 'en').slice(0, 8),
+    title: String(roadmap?.title || '').slice(0, 200),
+    summary: String(roadmap?.summary || '').slice(0, 1200),
+    steps: steps.map(toStoredRoadmapStep),
+    resourceIds: steps
+      .flatMap((step) => (step.resources || []).map((resource) => resource?.id))
+      .filter(Boolean)
+      .slice(0, 60),
+    createdAt: serverTimestamp()
+  });
+  return ref.id;
+}
+
+export async function fetchRoadmaps(uid) {
+  if (!db || !uid) return [];
+  const snap = await getDocs(query(collection(db, 'roadmaps'), where('userId', '==', uid)));
+  return snap.docs
+    .map((entry) => ({
+      ...entry.data(),
+      id: entry.id,
+      createdAt: normalizeTimestamp(entry.data().createdAt)
+    }))
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+export async function deleteRoadmap(roadmapId) {
+  if (!db || !roadmapId) throw new Error('Sign in to manage roadmaps.');
+  await deleteDoc(doc(db, 'roadmaps', roadmapId));
 }
 
 // ---------------------------------------------------------------------------

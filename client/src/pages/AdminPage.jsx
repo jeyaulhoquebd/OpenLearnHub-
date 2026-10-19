@@ -12,6 +12,7 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Star,
   X
 } from 'lucide-react';
@@ -148,15 +149,21 @@ export default function AdminPage() {
               <h1 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">{t('admin.title')}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-navy-100/75">{t('admin.subtitle')}</p>
             </div>
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="btn shrink-0 border border-white/20 bg-white/10 text-white hover:bg-white/15"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              {t('admin.refresh')}
-            </button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link to="/admin/ai" className="btn border border-white/20 bg-white/10 text-white hover:bg-white/15">
+                <Sparkles className="h-4 w-4" />
+                {t('adminAi.title')}
+              </Link>
+              <button
+                type="button"
+                onClick={load}
+                disabled={loading}
+                className="btn border border-white/20 bg-white/10 text-white hover:bg-white/15"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {t('admin.refresh')}
+              </button>
+            </div>
           </div>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3">

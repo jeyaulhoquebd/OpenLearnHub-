@@ -16,6 +16,7 @@ const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
 const SubmitResourcePage = lazy(() => import('./pages/SubmitResourcePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AdminAiSettingsPage = lazy(() => import('./pages/AdminAiSettingsPage'));
 const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -77,6 +78,14 @@ export default function App() {
                     element={withSuspense(
                       <ProtectedRoute adminOnly>
                         <AdminPage />
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route
+                    path="admin/ai"
+                    element={withSuspense(
+                      <ProtectedRoute adminOnly>
+                        <AdminAiSettingsPage />
                       </ProtectedRoute>
                     )}
                   />

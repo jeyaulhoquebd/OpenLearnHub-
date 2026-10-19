@@ -1,16 +1,24 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, Check, Layers3, ShieldCheck, Sparkles, Target } from 'lucide-react';
+import { Bot, Check, Layers3, MessageSquare, Route, ShieldCheck, Sparkles, Target } from 'lucide-react';
 import ChatPanel from '../components/ChatPanel';
+import RoadmapBuilder from '../components/RoadmapBuilder';
 import { usePageMeta } from '../hooks/usePageMeta';
 
 export default function AssistantPage() {
   const { t } = useTranslation();
+  const [tab, setTab] = useState('chat');
   usePageMeta(t('assistant.pageTitle'), t('assistant.pageText'));
 
   const capabilities = [
     { icon: Target, text: t('assistant.capability1') },
     { icon: Layers3, text: t('assistant.capability2') },
     { icon: Bot, text: t('assistant.capability3') }
+  ];
+
+  const tabs = [
+    { key: 'chat', label: t('assistant.tabChat'), icon: MessageSquare },
+    { key: 'roadmap', label: t('assistant.tabRoadmap'), icon: Route }
   ];
 
   return (
@@ -71,7 +79,29 @@ export default function AssistantPage() {
           </aside>
 
           <div className="overflow-hidden rounded-3xl border border-sand-200 bg-surface shadow-float">
-            <ChatPanel variant="page" />
+            <div className="flex items-center gap-1 border-b border-sand-200 bg-sand-50 px-2 pt-2" role="tablist">
+              {tabs.map((item) => {
+                const Icon = item.icon;
+                const active = tab === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(item.key)}
+                    className={`relative flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-sm font-semibold transition ${
+                      active ? 'text-brand-800' : 'text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                    {active && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-navy-700" />}
+                  </button>
+                );
+              })}
+            </div>
+            {tab === 'chat' ? <ChatPanel variant="page" /> : <RoadmapBuilder />}
           </div>
         </div>
       </section>

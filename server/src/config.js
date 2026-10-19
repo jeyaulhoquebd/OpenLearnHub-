@@ -34,15 +34,25 @@ export const config = {
     adminEmails: parseList(process.env.ADMIN_EMAILS).map((email) => email.toLowerCase())
   },
   // Google Gemini — server-side only. The key must never reach the browser.
+  // This is the fallback credential; an admin-supplied key stored in
+  // Firestore `settings/ai` (encrypted) takes priority at request time.
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     timeoutMs: parseNumber(process.env.GEMINI_TIMEOUT_MS, 30000),
-    maxOutputTokens: parseNumber(process.env.GEMINI_MAX_OUTPUT_TOKENS, 1024)
+    maxOutputTokens: parseNumber(process.env.GEMINI_MAX_OUTPUT_TOKENS, 1024),
+    roadmapMaxOutputTokens: parseNumber(process.env.GEMINI_ROADMAP_MAX_OUTPUT_TOKENS, 2048)
+  },
+  // Secret used to encrypt the admin-managed Gemini key at rest.
+  // Recommended value: `openssl rand -hex 32` (64 hex chars = 32 bytes).
+  settings: {
+    encryptionKey: process.env.SETTINGS_ENCRYPTION_KEY || ''
   },
   limits: {
     reportsPerHour: parseNumber(process.env.REPORT_RATE_LIMIT_PER_HOUR, 12),
     aiPerHour: parseNumber(process.env.AI_RATE_LIMIT_PER_HOUR, 25),
+    roadmapPerHour: parseNumber(process.env.ROADMAP_RATE_LIMIT_PER_HOUR, 10),
+    roadmapPerDay: parseNumber(process.env.ROADMAP_DAILY_QUOTA, 20),
     globalPer15Min: parseNumber(process.env.GLOBAL_RATE_LIMIT_PER_15_MIN, 400)
   }
 };
@@ -51,8 +61,16 @@ export function assertProductionConfig() {
   const warnings = [];
   const { firebase } = config;
 
-  if (config.isProduction && !config.gemini.apiKey) {
-    warnings.push('GEMINI_API_KEY is not set — the AI assistant will return 503 until configured.');
+  if (config.isProduction && !config.gemini.apiKey && !config.settings.encryptionKey) {
+    warnings.push(
+      'Neither GEMINI_API_KEY nor SETTINGS_ENCRYPTION_KEY is set — the AI assistant will return 503 until an administrator configures a key.'
+    );
+  }
+
+  if (config.isProduction && !config.settings.encryptionKey) {
+    warnings.push(
+      'SETTINGS_ENCRYPTION_KEY is not set — saving a Gemini key from the admin AI Settings page is disabled (use GEMINI_API_KEY instead).'
+    );
   }
 
   const hasCredential =
