@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#FBFaf6"/>
+  <circle cx="1060" cy="80" r="260" fill="#D4F7E9"/>
+  <circle cx="1140" cy="620" r="220" fill="#F5F2E9"/>
+  <rect x="72" y="74" width="64" height="64" rx="16" fill="#0C493F"/>
+  <path d="M88 94.5C88 92.6 89.6 91 91.5 91H102v29H91.5C89.6 120 88 118.4 88 116.5v-22Z" fill="#74DFC0"/>
+  <path d="M120 94.5C120 92.6 118.4 91 116.5 91H106v29h10.5c1.9 0 3.5-1.6 3.5-3.5v-22Z" fill="#F5F2E9"/>
+  <circle cx="118" cy="119" r="8" fill="#F08A6B"/>
+  <text x="160" y="120" font-family="Plus Jakarta Sans, sans-serif" font-size="30" font-weight="700" fill="#12221E">OpenLearn Hub</text>
+  <text x="72" y="288" font-family="Fraunces, Georgia, serif" font-size="84" font-weight="600" fill="#12221E">Knowledge for</text>
+  <text x="72" y="382" font-family="Fraunces, Georgia, serif" font-size="84" font-weight="600" fill="#0C6E5B" font-style="italic">everyone.</text>
+  <text x="76" y="458" font-family="Plus Jakarta Sans, sans-serif" font-size="26" fill="#5E716B">Legal, free courses · books · open-source software</text>
+  <rect x="72" y="500" width="260" height="54" rx="27" fill="#0C493F"/>
+  <text x="100" y="535" font-family="Plus Jakarta Sans, sans-serif" font-size="20" font-weight="600" fill="#fff">openlearnhub.org</text>
+  <text x="760" y="560" font-family="Plus Jakarta Sans, sans-serif" font-size="22" font-weight="600" fill="#0C493F">BD · IN · PK</text>
+</svg>

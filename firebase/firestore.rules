@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isNonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    // ---------- resources ----------
+    // Published resources are public. Pending/rejected resources are visible
+    // only to their submitter and to admins. Only admins may publish, edit,
+    // feature, or delete a listing. Reports about resources live in /reports.
+    match /resources/{resourceId} {
+      allow read: if
+        (resource.data.status == 'published') ||
+        isAdmin() ||
+        (isSignedIn() && resource.data.createdBy == request.auth.uid);
+
+      allow create: if
+        isSignedIn() &&
+        request.resource.data.id == resourceId &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.featured == false &&
+        request.resource.data.type in ['course', 'book', 'software'] &&
+        isNonEmptyString(request.resource.data.title) &&
+        isNonEmptyString(request.resource.data.provider) &&
+        isNonEmptyString(request.resource.data.description) &&
+        isNonEmptyString(request.resource.data.license) &&
+        isNonEmptyString(request.resource.data.url) &&
+        request.resource.data.url.matches('^https://.*') &&
+        request.resource.data.languages is list &&
+        request.resource.data.languages.size() > 0 &&
+        request.resource.data.countries is list &&
+        request.resource.data.countries.size() > 0 &&
+        request.resource.data.description.size() <= 2000 &&
+        request.resource.data.title.size() <= 160 &&
+        request.resource.data.provider.size() <= 160 &&
+        (!('licenseUrl' in request.resource.data) ||
+          request.resource.data.licenseUrl == null ||
+          request.resource.data.licenseUrl.matches('^https://.*')) &&
+        (!('thumbnailUrl' in request.resource.data) ||
+          request.resource.data.thumbnailUrl == null ||
+          request.resource.data.thumbnailUrl is string);
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- user profiles ----------
+    // A user can read and edit only their own profile, and can never promote
+    // themselves to admin. Admins can manage roles.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if
+        isOwner(userId) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.role == 'user';
+
+      allow update: if
+        isAdmin() ||
+        (
+          isOwner(userId) &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.role == resource.data.role
+        );
+
+      allow delete: if isAdmin();
+
+      // Personal saved resources. Private to the owner.
+      match /bookmarks/{resourceId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ---------- reports ----------
+    // Reports are created by the Express API with the Admin SDK (which bypasses
+    // these rules), so the public client can never write here. Admins review
+    // reports from the moderation dashboard.
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if false;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- default deny ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

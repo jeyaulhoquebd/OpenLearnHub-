@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// OpenLearn Hub uses Cloud Storage for ONE purpose only: small cover images
+// (thumbnails) attached to community resource submissions. We never allow
+// executables, archives, or documents to be uploaded.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /thumbnails/{userId}/{fileName} {
+      // Thumbnails are public so resource cards can render them.
+      allow read: if true;
+
+      // A signed-in user may upload only into their own folder, only image
+      // files, and only up to 2 MB.
+      allow create, update: if
+        request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.size < 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+
+      // Only the owner (or Firebase Admin via the server) may delete.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Everything else is denied.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
