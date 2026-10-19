@@ -139,7 +139,7 @@ export default function ResourceDetailPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-white pb-10 pt-8 sm:pb-14">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-surface pb-10 pt-8 sm:pb-14">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.35]" />
         <div className="pointer-events-none absolute -end-32 -top-32 h-96 w-96 rounded-full bg-brand-100/50 blur-3xl" />
         <div className="container-page relative">
@@ -160,13 +160,13 @@ export default function ResourceDetailPage() {
                   {t('common.legal')}
                 </span>
                 {resource.featured && (
-                  <span className="chip bg-coral-500/10 text-coral-700 ring-coral-400/30">
+                  <span className="chip bg-accent-500/10 text-accent-700 ring-accent-400/30 dark:text-accent-200">
                     <Sparkles className="h-3 w-3" />
                     {t('common.verified')}
                   </span>
                 )}
                 {isPending && (
-                  <span className="chip bg-amber-50 text-amber-800 ring-amber-200">{t('resource.underReview')}</span>
+                  <span className="chip bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">{t('resource.underReview')}</span>
                 )}
               </div>
 
@@ -194,7 +194,7 @@ export default function ResourceDetailPage() {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-white px-4 py-3 text-sm font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800"
+                  className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-surface px-4 py-3 text-sm font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800"
                 >
                   <Share2 className="h-4 w-4" />
                   {t('resource.share')}
@@ -202,7 +202,7 @@ export default function ResourceDetailPage() {
                 <button
                   type="button"
                   onClick={() => setReportOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-white px-4 py-3 text-sm font-semibold text-ink-muted shadow-sm transition hover:border-amber-300 hover:text-amber-700"
+                  className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-surface px-4 py-3 text-sm font-semibold text-ink-muted shadow-sm transition hover:border-amber-300 hover:text-amber-700"
                 >
                   <Flag className="h-4 w-4" />
                   {t('common.report')}
@@ -255,7 +255,7 @@ export default function ResourceDetailPage() {
 
             <div className="mt-5 rounded-3xl border border-brand-200 bg-brand-50/60 p-6">
               <div className="flex items-start gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-brand-700 shadow-sm ring-1 ring-brand-100">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-surface text-brand-700 shadow-sm ring-1 ring-brand-100">
                   <ShieldCheck className="h-5 w-5" />
                 </span>
                 <div>
@@ -268,7 +268,7 @@ export default function ResourceDetailPage() {
                     <button
                       type="button"
                       onClick={() => setReportOpen(true)}
-                      className="text-xs font-semibold text-amber-700 underline underline-offset-2"
+                      className="text-xs font-semibold text-amber-700 underline underline-offset-2 dark:text-amber-300"
                     >
                       {t('resource.copyrightConcern')}
                     </button>

@@ -2,10 +2,18 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from '../locales/en.json';
 import bn from '../locales/bn.json';
-import hi from '../locales/hi.json';
 import ur from '../locales/ur.json';
 
-const supported = ['en', 'bn', 'hi', 'ur'];
+// Active UI languages. To add another language later, drop a new JSON file in
+// ../locales and append its code here (plus add it to LanguageSwitcher).
+const supported = ['en', 'bn', 'ur'];
+
+export const SUPPORTED_LANGUAGES = [
+  { code: 'en', label: 'English', short: 'EN' },
+  { code: 'bn', label: 'বাংলা', short: 'বাং' },
+  { code: 'ur', label: 'اردو', short: 'اردو' }
+];
+
 const stored = typeof window !== 'undefined' ? window.localStorage.getItem('openlearn.language') : null;
 const initialLanguage = supported.includes(stored) ? stored : 'en';
 
@@ -25,7 +33,6 @@ i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
     bn: { translation: bn },
-    hi: { translation: hi },
     ur: { translation: ur }
   },
   lng: initialLanguage,

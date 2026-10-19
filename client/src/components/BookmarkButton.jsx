@@ -73,7 +73,7 @@ export default function BookmarkButton({ resource, className = '', labelPosition
       aria-pressed={saved}
       aria-label={saved ? t('resource.saved') : t('resource.save')}
       title={saved ? t('resource.saved') : t('resource.save')}
-      className={`inline-flex items-center gap-2 rounded-full border border-sand-300 bg-white px-3 py-2 text-xs font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800 ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full border border-sand-300 bg-surface px-3 py-2 text-xs font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800 ${className}`}
     >
       <Icon className={`h-4 w-4 ${busy ? 'animate-spin' : ''} ${saved ? 'text-brand-700' : ''}`} />
       {labelPosition === 'full' && <span>{saved ? t('resource.saved') : t('resource.save')}</span>}

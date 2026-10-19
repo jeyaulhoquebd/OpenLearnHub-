@@ -129,15 +129,15 @@ export default function AdminPage() {
 
   const statCards = [
     { label: t('admin.published'), value: counts.resources, icon: Star, color: 'bg-brand-50 text-brand-700' },
-    { label: t('admin.pending'), value: pending.length, icon: Clock3, color: 'bg-amber-50 text-amber-700' },
-    { label: t('admin.openReports'), value: openReports.length, icon: Flag, color: 'bg-rose-50 text-rose-700' }
+    { label: t('admin.pending'), value: pending.length, icon: Clock3, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+    { label: t('admin.openReports'), value: openReports.length, icon: Flag, color: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' }
   ];
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-brand-950 pb-10 pt-10 text-white">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-navy-950 pb-10 pt-10 text-white">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-10" />
-        <div className="pointer-events-none absolute -end-20 -top-24 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -end-20 -top-24 h-72 w-72 rounded-full bg-navy-500/20 blur-3xl" />
         <div className="container-page relative">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -146,7 +146,7 @@ export default function AdminPage() {
                 {t('admin.eyebrow')}
               </span>
               <h1 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">{t('admin.title')}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-brand-100/75">{t('admin.subtitle')}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-navy-100/75">{t('admin.subtitle')}</p>
             </div>
             <button
               type="button"
@@ -169,7 +169,7 @@ export default function AdminPage() {
                   </span>
                   <div>
                     <p className="font-display text-2xl font-semibold">{loading ? '—' : stat.value}</p>
-                    <p className="text-xs text-brand-100/70">{stat.label}</p>
+                    <p className="text-xs text-navy-100/70">{stat.label}</p>
                   </div>
                 </div>
               );
@@ -194,7 +194,7 @@ export default function AdminPage() {
             >
               {item.label}
               <span className="ms-1.5 rounded-full bg-sand-100 px-1.5 py-0.5 text-[10px] text-ink-muted">{item.count}</span>
-              {tab === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand-700" />}
+              {tab === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-navy-700" />}
             </button>
           ))}
         </div>
@@ -217,7 +217,7 @@ export default function AdminPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`chip ${meta.chip}`}>{t(meta.labelKey)}</span>
-                            <span className="chip bg-amber-50 text-amber-800 ring-amber-200">
+                            <span className="chip bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
                               <Clock3 className="h-3 w-3" />
                               {t('dashboard.statusPending')}
                             </span>
@@ -271,7 +271,7 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => handleReject(resource)}
                             disabled={busyId === resource.id}
-                            className="btn btn-sm justify-center border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                            className="btn btn-sm justify-center border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
                           >
                             <X className="h-4 w-4" />
                             {t('admin.reject')}

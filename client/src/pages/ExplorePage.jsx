@@ -106,12 +106,12 @@ export default function ExplorePage({ fixedType = null }) {
 
   const tabClass = (active) =>
     `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-      active ? 'bg-brand-900 text-white shadow-sm' : 'bg-white text-ink-soft ring-1 ring-inset ring-sand-300 hover:text-brand-800'
+      active ? 'bg-navy-900 text-white shadow-sm' : 'bg-surface text-ink-soft ring-1 ring-inset ring-sand-300 hover:text-brand-800'
     }`;
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/60 pb-10 pt-10 sm:pb-12 sm:pt-14">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/60 pb-10 pt-10 sm:pb-12 sm:pt-14 dark:to-accent-500/10">
         <div className="pointer-events-none absolute -end-24 -top-28 h-80 w-80 rounded-full bg-brand-100/70 blur-3xl" />
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.28]" />
         <div className="container-page relative">
@@ -126,13 +126,13 @@ export default function ExplorePage({ fixedType = null }) {
           <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-2xl">
               <span className="eyebrow">
-                <span className="h-px w-7 bg-brand-500" />
+                <span className="h-px w-7 bg-navy-500" />
                 {t('explore.eyebrow')}
               </span>
               <h1 className="display-title mt-3">{title}</h1>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft sm:text-base">{subtitle}</p>
             </div>
-            <div className="hidden items-center gap-2 rounded-2xl border border-brand-200 bg-white/80 px-4 py-3 text-xs font-semibold text-brand-800 shadow-sm backdrop-blur lg:flex">
+            <div className="hidden items-center gap-2 rounded-2xl border border-brand-200 bg-white/80 px-4 py-3 text-xs font-semibold text-brand-800 shadow-sm backdrop-blur lg:flex dark:bg-white/10">
               <Sparkles className="h-4 w-4" />
               {loading ? t('common.loading') : t('common.results', { count: filtered.length })}
             </div>
@@ -164,7 +164,7 @@ export default function ExplorePage({ fixedType = null }) {
                 <SlidersHorizontal className="h-4 w-4" />
                 {filtersOpen ? t('explore.hideFilters') : t('explore.filters')}
                 {activeFilterCount > 0 && (
-                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand-800 px-1 text-[10px] text-white">
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-navy-800 px-1 text-[10px] text-white">
                     {activeFilterCount}
                   </span>
                 )}
@@ -177,7 +177,7 @@ export default function ExplorePage({ fixedType = null }) {
             </div>
 
             <div
-              className={`mt-4 rounded-3xl border border-sand-200 bg-white p-5 shadow-sm lg:mt-0 lg:block ${
+              className={`mt-4 rounded-3xl border border-sand-200 bg-surface p-5 shadow-sm lg:mt-0 lg:block ${
                 filtersOpen ? 'block' : 'hidden'
               }`}
             >

@@ -25,9 +25,9 @@ import { fetchBookmarks, fetchUserSubmissions } from '../lib/data';
 import { formatDate, initials } from '../lib/utils';
 
 const STATUS_META = {
-  pending: { icon: Clock3, className: 'bg-amber-50 text-amber-800 ring-amber-200', key: 'dashboard.statusPending' },
+  pending: { icon: Clock3, className: 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30', key: 'dashboard.statusPending' },
   published: { icon: CheckCircle2, className: 'bg-brand-50 text-brand-800 ring-brand-200', key: 'dashboard.statusPublished' },
-  rejected: { icon: XCircle, className: 'bg-red-50 text-red-700 ring-red-200', key: 'dashboard.statusRejected' }
+  rejected: { icon: XCircle, className: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30', key: 'dashboard.statusRejected' }
 };
 
 export default function DashboardPage() {
@@ -100,17 +100,17 @@ export default function DashboardPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-white to-amber-50/50 pb-10 pt-10">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-white to-amber-50/50 pb-10 pt-10 dark:via-transparent dark:to-accent-500/10">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-25" />
         <div className="container-page relative">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-center gap-4">
-              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl bg-brand-900 font-display text-xl font-semibold text-white shadow-soft">
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-3xl bg-navy-900 font-display text-xl font-semibold text-white shadow-soft">
                 {initials(displayName)}
               </span>
               <div>
                 <p className="eyebrow">
-                  <span className="h-px w-7 bg-brand-500" />
+                  <span className="h-px w-7 bg-navy-500" />
                   {t('dashboard.eyebrow')}
                 </p>
                 <h1 className="mt-2 font-display text-3xl font-semibold text-ink sm:text-4xl">
@@ -132,12 +132,12 @@ export default function DashboardPage() {
           </div>
 
           {user && !user.emailVerified && (
-            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10">
               <div className="flex items-start gap-2.5">
-                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-900">{t('dashboard.verifyTitle')}</p>
-                  <p className="mt-0.5 text-xs text-amber-900">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t('dashboard.verifyTitle')}</p>
+                  <p className="mt-0.5 text-xs text-amber-900 dark:text-amber-200">
                     {t('dashboard.verifyText', { email: user.email })}
                   </p>
                 </div>
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                   type="button"
                   key={stat.label}
                   onClick={() => setTab(stat.tab)}
-                  className={`flex items-center gap-4 rounded-2xl border bg-white/90 p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:shadow-card ${
+                  className={`flex items-center gap-4 rounded-2xl border bg-white/90 p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:shadow-card dark:bg-white/5 ${
                     activeTab === stat.tab ? 'border-brand-300 ring-1 ring-brand-200' : 'border-sand-200'
                   }`}
                 >
@@ -193,7 +193,7 @@ export default function DashboardPage() {
               {typeof tab.count === 'number' && (
                 <span className="ms-1.5 rounded-full bg-sand-100 px-1.5 py-0.5 text-[10px] text-ink-muted">{tab.count}</span>
               )}
-              {activeTab === tab.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand-700" />}
+              {activeTab === tab.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-navy-700" />}
             </button>
           ))}
         </div>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                         </>
                       ) : (
                         <>
-                          <Clock3 className="h-4 w-4 text-amber-500" />
+                          <Clock3 className="h-4 w-4 text-amber-500 dark:text-amber-400" />
                           {t('dashboard.statusPending')}
                         </>
                       )}
@@ -334,8 +334,8 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-sand-200 bg-white p-6 shadow-sm">
-                  <Sparkles className="h-6 w-6 text-coral-500" />
+                <div className="rounded-3xl border border-sand-200 bg-surface p-6 shadow-sm">
+                  <Sparkles className="h-6 w-6 text-accent-500" />
                   <h2 className="mt-3 font-display text-xl font-semibold text-ink">{t('assistant.title')}</h2>
                   <p className="mt-1.5 text-sm text-ink-soft">{t('assistant.pageText')}</p>
                   <Link to="/assistant" className="btn-secondary mt-4">

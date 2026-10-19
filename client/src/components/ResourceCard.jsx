@@ -29,7 +29,7 @@ export default function ResourceCard({ resource, compact = false }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className={`chip ${meta.chip}`}>{t(meta.labelKey)}</span>
             {resource.featured && (
-              <span className="chip bg-coral-500/10 text-coral-700 ring-coral-400/30">
+              <span className="chip bg-accent-500/10 text-accent-700 ring-accent-400/30">
                 <Sparkles className="h-3 w-3" />
                 {t('common.verified')}
               </span>
@@ -74,7 +74,7 @@ export default function ResourceCard({ resource, compact = false }) {
               <button
                 type="button"
                 onClick={() => setReportOpen(true)}
-                className="inline-flex items-center rounded-full border border-sand-300 bg-white px-3 py-2 text-xs font-semibold text-ink-muted shadow-sm transition hover:border-amber-300 hover:text-amber-700"
+                className="inline-flex items-center rounded-full border border-sand-300 bg-surface px-3 py-2 text-xs font-semibold text-ink-muted shadow-sm transition hover:border-amber-300 hover:text-amber-700"
                 aria-label={t('resource.report')}
                 title={t('resource.report')}
               >

@@ -46,7 +46,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="mt-auto border-t border-sand-200 bg-white">
+    <footer className="mt-auto border-t border-sand-200 bg-surface">
       <div className="container-page py-14">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div className="max-w-sm">

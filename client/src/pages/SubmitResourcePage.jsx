@@ -24,9 +24,9 @@ import { isValidHttpsUrl } from '../lib/utils';
 import { usePageMeta } from '../hooks/usePageMeta';
 
 const TYPE_OPTIONS = [
-  { value: 'course', icon: PlayCircle, color: 'peer-checked:border-brand-500 peer-checked:bg-brand-50' },
-  { value: 'book', icon: BookOpen, color: 'peer-checked:border-amber-500 peer-checked:bg-amber-50' },
-  { value: 'software', icon: AppWindow, color: 'peer-checked:border-indigo-500 peer-checked:bg-indigo-50' }
+  { value: 'course', icon: PlayCircle, color: 'peer-checked:border-navy-500 peer-checked:bg-brand-50' },
+  { value: 'book', icon: BookOpen, color: 'peer-checked:border-amber-500 peer-checked:bg-amber-50 dark:peer-checked:border-amber-400 dark:peer-checked:bg-amber-500/10' },
+  { value: 'software', icon: AppWindow, color: 'peer-checked:border-accent-500 peer-checked:bg-accent-50 dark:peer-checked:border-accent-400 dark:peer-checked:bg-accent-500/15' }
 ];
 
 const initialForm = {
@@ -199,12 +199,12 @@ export default function SubmitResourcePage() {
     return (
       <section className="container-page section">
         <div className="card mx-auto max-w-xl overflow-hidden text-center">
-          <div className="bg-gradient-to-br from-brand-800 to-brand-600 px-6 py-10 text-white">
+          <div className="bg-gradient-to-br from-navy-800 to-navy-600 px-6 py-10 text-white">
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/15 ring-1 ring-inset ring-white/25">
               <CheckCircle2 className="h-8 w-8" />
             </span>
             <h1 className="mt-5 font-display text-3xl font-semibold">{t('submit.successTitle')}</h1>
-            <p className="mt-2 text-sm text-brand-100/80">{t('submit.previewNote')}</p>
+            <p className="mt-2 text-sm text-navy-100/80">{t('submit.previewNote')}</p>
           </div>
           <div className="p-7">
             <p className="text-sm leading-relaxed text-ink-soft">{t('submit.successText')}</p>
@@ -234,11 +234,11 @@ export default function SubmitResourcePage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/50 pb-10 pt-10 sm:pb-14">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/50 pb-10 pt-10 sm:pb-14 dark:to-accent-500/10">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-30" />
         <div className="container-page relative">
           <span className="eyebrow">
-            <span className="h-px w-7 bg-brand-500" />
+            <span className="h-px w-7 bg-navy-500" />
             {t('submit.eyebrow')}
           </span>
           <h1 className="display-title mt-3 max-w-3xl">{t('submit.title')}</h1>
@@ -276,7 +276,7 @@ export default function SubmitResourcePage() {
                       />
                       <span
                         className={`flex items-center gap-3 rounded-2xl border p-4 transition ${
-                          isActive ? 'border-brand-500 bg-brand-50/70 shadow-sm' : 'border-sand-200 bg-white hover:border-brand-200'
+                          isActive ? 'border-navy-500 bg-brand-50/70 shadow-sm' : 'border-sand-200 bg-surface hover:border-brand-200'
                         }`}
                       >
                         <Icon className={`h-5 w-5 ${isActive ? 'text-brand-700' : 'text-ink-muted'}`} />
@@ -410,8 +410,8 @@ export default function SubmitResourcePage() {
                       key={language}
                       className={`cursor-pointer rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
                         form.languages.includes(language)
-                          ? 'border-brand-500 bg-brand-50 text-brand-800'
-                          : 'border-sand-300 bg-white text-ink-soft hover:border-brand-300'
+                          ? 'border-navy-500 bg-brand-50 text-brand-800'
+                          : 'border-sand-300 bg-surface text-ink-soft hover:border-brand-300'
                       }`}
                     >
                       <input
@@ -433,8 +433,8 @@ export default function SubmitResourcePage() {
                       key={country}
                       className={`cursor-pointer rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
                         form.countries.includes(country)
-                          ? 'border-brand-500 bg-brand-50 text-brand-800'
-                          : 'border-sand-300 bg-white text-ink-soft hover:border-brand-300'
+                          ? 'border-navy-500 bg-brand-50 text-brand-800'
+                          : 'border-sand-300 bg-surface text-ink-soft hover:border-brand-300'
                       }`}
                     >
                       <input
@@ -457,8 +457,8 @@ export default function SubmitResourcePage() {
                         key={platform}
                         className={`cursor-pointer rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
                           form.platform.includes(platform)
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-800'
-                            : 'border-sand-300 bg-white text-ink-soft hover:border-indigo-300'
+                            ? 'border-accent-500 bg-accent-50 text-accent-800 dark:border-accent-400 dark:bg-accent-500/15 dark:text-accent-200'
+                            : 'border-sand-300 bg-surface text-ink-soft hover:border-accent-300'
                         }`}
                       >
                         <input
@@ -550,7 +550,7 @@ export default function SubmitResourcePage() {
                         setThumbnail(null);
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
-                      className="absolute end-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-ink shadow-sm transition hover:bg-white"
+                      className="absolute end-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-ink shadow-sm transition hover:bg-surface dark:bg-white/15"
                       aria-label={t('common.close')}
                     >
                       <X className="h-4 w-4" />
@@ -562,7 +562,7 @@ export default function SubmitResourcePage() {
                     onClick={() => fileInputRef.current?.click()}
                     className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-sand-300 bg-sand-50/60 px-5 py-8 text-center transition hover:border-brand-400 hover:bg-brand-50/40"
                   >
-                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-white text-brand-700 shadow-sm">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-surface text-brand-700 shadow-sm">
                       <Upload className="h-4 w-4" />
                     </span>
                     <span className="text-sm font-semibold text-ink">Choose an image</span>
@@ -599,7 +599,7 @@ export default function SubmitResourcePage() {
               </label>
 
               {error && (
-                <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   {error}
                 </p>
@@ -642,7 +642,7 @@ export default function SubmitResourcePage() {
               </Link>
             </div>
 
-            <div className="rounded-3xl border border-sand-200 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-sand-200 bg-surface p-5 shadow-sm">
               <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
                 <FileImage className="h-4 w-4 text-ink-muted" />
                 Tips for approval

@@ -2,13 +2,13 @@ import { AppWindow, BookOpen, PlayCircle } from 'lucide-react';
 import { monogram } from '../lib/utils';
 
 const TYPE_GRADIENTS = {
-  course: 'from-brand-900 via-brand-700 to-brand-500',
+  course: 'from-navy-900 via-navy-700 to-navy-500',
   book: 'from-amber-800 via-amber-600 to-orange-400',
   software: 'from-indigo-950 via-indigo-700 to-violet-500'
 };
 
 const ACCENT_GRADIENTS = {
-  teal: 'from-brand-900 via-brand-700 to-brand-500',
+  teal: 'from-navy-900 via-navy-700 to-navy-500',
   emerald: 'from-emerald-900 via-emerald-700 to-teal-400',
   lime: 'from-lime-800 via-lime-600 to-emerald-400',
   amber: 'from-amber-800 via-amber-600 to-orange-400',

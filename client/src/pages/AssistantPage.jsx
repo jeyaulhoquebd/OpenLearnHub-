@@ -15,12 +15,12 @@ export default function AssistantPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-white to-amber-50/50 pb-10 pt-10 sm:pb-14">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-white to-amber-50/50 pb-10 pt-10 sm:pb-14 dark:via-transparent dark:to-accent-500/10">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-25" />
         <div className="pointer-events-none absolute -end-24 -top-24 h-80 w-80 rounded-full bg-brand-100/70 blur-3xl" />
         <div className="container-page relative">
           <span className="eyebrow">
-            <span className="h-px w-7 bg-brand-500" />
+            <span className="h-px w-7 bg-navy-500" />
             {t('assistant.pageEyebrow')}
           </span>
           <h1 className="display-title mt-3 max-w-3xl">{t('assistant.pageTitle')}</h1>
@@ -32,7 +32,7 @@ export default function AssistantPage() {
         <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
           <aside className="space-y-4 lg:sticky lg:top-24">
             <div className="rounded-3xl border border-brand-200 bg-brand-50/70 p-6">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-800 text-white shadow-soft">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-navy-800 text-white shadow-soft">
                 <Sparkles className="h-5 w-5" />
               </span>
               <h2 className="mt-4 font-display text-2xl font-semibold text-brand-950">{t('assistant.title')}</h2>
@@ -42,7 +42,7 @@ export default function AssistantPage() {
                   const Icon = capability.icon;
                   return (
                     <li key={capability.text} className="flex items-start gap-2.5 text-sm text-brand-900/80">
-                      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white text-brand-700 shadow-sm">
+                      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-surface text-brand-700 shadow-sm">
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       {capability.text}
@@ -52,7 +52,7 @@ export default function AssistantPage() {
               </ul>
             </div>
 
-            <div className="rounded-3xl border border-sand-200 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-sand-200 bg-surface p-5 shadow-sm">
               <p className="flex items-center gap-2 text-sm font-bold text-ink">
                 <ShieldCheck className="h-4 w-4 text-brand-700" />
                 {t('home.legalEyebrow')}
@@ -70,7 +70,7 @@ export default function AssistantPage() {
             </div>
           </aside>
 
-          <div className="overflow-hidden rounded-3xl border border-sand-200 bg-white shadow-float">
+          <div className="overflow-hidden rounded-3xl border border-sand-200 bg-surface shadow-float">
             <ChatPanel variant="page" />
           </div>
         </div>

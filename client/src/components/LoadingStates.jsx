@@ -31,8 +31,8 @@ export function PageLoader({ label = 'Loading…' }) {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4" role="status">
       <span className="relative flex h-12 w-12">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-40" />
-        <span className="relative inline-flex h-12 w-12 rounded-full bg-brand-700" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-navy-400 opacity-40" />
+        <span className="relative inline-flex h-12 w-12 rounded-full bg-navy-700" />
       </span>
       <p className="text-sm font-medium text-ink-muted">{label}</p>
     </div>

@@ -10,7 +10,7 @@ export default function NotFoundPage() {
   return (
     <section className="container-page section">
       <div className="card mx-auto max-w-xl overflow-hidden text-center">
-        <div className="relative overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-6 py-12 text-white">
+        <div className="relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-800 to-navy-600 px-6 py-12 text-white">
           <div className="absolute inset-0 bg-grid opacity-15" />
           <div className="relative">
             <p className="font-display text-7xl font-semibold">404</p>

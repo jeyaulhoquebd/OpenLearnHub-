@@ -28,12 +28,12 @@ export default function AboutPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/50 pb-12 pt-12 sm:pb-16">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-white to-amber-50/50 pb-12 pt-12 sm:pb-16 dark:via-transparent dark:to-accent-500/10">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-25" />
         <div className="container-page relative grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             <span className="eyebrow">
-              <span className="h-px w-7 bg-brand-500" />
+              <span className="h-px w-7 bg-navy-500" />
               {t('about.eyebrow')}
             </span>
             <h1 className="display-title mt-3">{t('about.title')}</h1>
@@ -56,7 +56,7 @@ export default function AboutPage() {
               { country: 'India', label: t('home.india') },
               { country: 'Pakistan', label: t('home.pakistan') }
             ].map((item) => (
-              <div key={item.country} className="rounded-3xl border border-sand-200 bg-white p-5 text-center shadow-sm">
+              <div key={item.country} className="rounded-3xl border border-sand-200 bg-surface p-5 text-center shadow-sm">
                 <span className="text-3xl" aria-hidden="true">
                   {COUNTRY_FLAGS[item.country]}
                 </span>
@@ -64,14 +64,14 @@ export default function AboutPage() {
                 <p className="mt-1 text-xs text-ink-muted">{t('home.statCountries')}</p>
               </div>
             ))}
-            <div className="rounded-3xl border border-brand-200 bg-brand-900 p-5 text-white sm:col-span-3">
+            <div className="rounded-3xl border border-brand-200 bg-navy-900 p-5 text-white sm:col-span-3">
               <div className="flex items-center gap-4">
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/20">
                   <Users className="h-5 w-5" />
                 </span>
                 <div>
                   <p className="font-display text-xl font-semibold">{t('common.tagline')}</p>
-                  <p className="mt-0.5 text-xs text-brand-100/70">{t('footer.madeFor')}</p>
+                  <p className="mt-0.5 text-xs text-navy-100/70">{t('footer.madeFor')}</p>
                 </div>
               </div>
             </div>
@@ -81,7 +81,7 @@ export default function AboutPage() {
 
       <section className="section">
         <div className="container-page grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
-          <div className="rounded-[2rem] border border-sand-200 bg-white p-7 shadow-card sm:p-9">
+          <div className="rounded-[2rem] border border-sand-200 bg-surface p-7 shadow-card sm:p-9">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
               <Target className="h-5 w-5" />
             </span>
@@ -96,7 +96,7 @@ export default function AboutPage() {
 
           <div>
             <span className="eyebrow">
-              <span className="h-px w-7 bg-brand-500" />
+              <span className="h-px w-7 bg-navy-500" />
               {t('about.standardsTitle')}
             </span>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -104,7 +104,7 @@ export default function AboutPage() {
                 const Icon = standard.icon;
                 return (
                   <div key={standard.title} className="rounded-2xl border border-sand-200 bg-sand-50/60 p-5">
-                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-white text-brand-700 shadow-sm ring-1 ring-sand-200">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-surface text-brand-700 shadow-sm ring-1 ring-sand-200">
                       <Icon className="h-4 w-4" />
                     </span>
                     <h3 className="mt-4 text-sm font-bold text-ink">{standard.title}</h3>
@@ -117,25 +117,25 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="section bg-white">
+      <section className="section bg-surface">
         <div className="container-page grid gap-8 lg:grid-cols-2">
           <div className="rounded-[2rem] border border-sand-200 bg-sand-50/60 p-7 sm:p-9">
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-brand-700 shadow-sm ring-1 ring-sand-200">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-surface text-brand-700 shadow-sm ring-1 ring-sand-200">
               <Globe2 className="h-5 w-5" />
             </span>
             <h2 className="mt-5 font-display text-3xl font-semibold text-ink">{t('about.regionalTitle')}</h2>
             <p className="mt-4 text-[15px] leading-7 text-ink-soft">{t('about.regionalText')}</p>
             <div className="mt-6 flex flex-wrap gap-2">
               {['Bangladesh', 'India', 'Pakistan'].map((country) => (
-                <span key={country} className="rounded-full border border-sand-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink-soft">
+                <span key={country} className="rounded-full border border-sand-300 bg-surface px-3 py-1.5 text-xs font-semibold text-ink-soft">
                   {COUNTRY_FLAGS[country]} {country}
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-sand-200 bg-white p-7 shadow-card sm:p-9">
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-coral-500/10 text-coral-600">
+          <div className="rounded-[2rem] border border-sand-200 bg-surface p-7 shadow-card sm:p-9">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-accent-500/10 text-accent-600">
               <Sparkles className="h-5 w-5" />
             </span>
             <h2 className="mt-5 font-display text-3xl font-semibold text-ink">{t('about.aiTitle')}</h2>
@@ -150,16 +150,16 @@ export default function AboutPage() {
 
       <section className="section">
         <div className="container-page">
-          <div className="relative overflow-hidden rounded-[2.5rem] bg-brand-950 p-8 text-white sm:p-12">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-navy-950 p-8 text-white sm:p-12">
             <div className="absolute inset-0 bg-grid opacity-10" />
             <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
               <div>
-                <BookOpen className="h-8 w-8 text-brand-300" />
+                <BookOpen className="h-8 w-8 text-navy-300" />
                 <h2 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">{t('about.contactTitle')}</h2>
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-brand-100/75">{t('about.contactText')}</p>
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-navy-100/75">{t('about.contactText')}</p>
               </div>
               <div className="flex flex-col gap-3">
-                <a href={`mailto:${contactEmail}`} className="btn justify-center bg-white text-brand-950 hover:bg-brand-50">
+                <a href={`mailto:${contactEmail}`} className="btn justify-center bg-surface text-brand-950 hover:bg-brand-50">
                   <Mail className="h-4 w-4" />
                   {t('about.contactButton')}
                 </a>

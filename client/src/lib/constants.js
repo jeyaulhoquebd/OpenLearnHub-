@@ -6,27 +6,27 @@ export const TYPE_META = {
     singularKey: 'type.course',
     icon: 'PlayCircle',
     chip: 'bg-brand-50 text-brand-800 ring-brand-200',
-    dot: 'bg-brand-500',
-    gradient: 'from-brand-800 via-brand-700 to-brand-500',
+    dot: 'bg-navy-500',
+    gradient: 'from-navy-800 via-navy-700 to-navy-500',
     soft: 'from-brand-50 to-brand-100/50'
   },
   book: {
     labelKey: 'type.book',
     singularKey: 'type.book',
     icon: 'BookOpen',
-    chip: 'bg-amber-50 text-amber-900 ring-amber-200',
+    chip: 'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30',
     dot: 'bg-amber-500',
-    gradient: 'from-amber-700 via-amber-600 to-orange-400',
-    soft: 'from-amber-50 to-orange-50'
+    gradient: 'from-amber-600 via-amber-500 to-orange-400',
+    soft: 'from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10'
   },
   software: {
     labelKey: 'type.software',
     singularKey: 'type.software',
     icon: 'AppWindow',
-    chip: 'bg-indigo-50 text-indigo-800 ring-indigo-200',
-    dot: 'bg-indigo-500',
-    gradient: 'from-indigo-900 via-indigo-700 to-violet-500',
-    soft: 'from-indigo-50 to-violet-50'
+    chip: 'bg-accent-50 text-accent-800 ring-accent-200 dark:bg-accent-500/15 dark:text-accent-200 dark:ring-accent-500/30',
+    dot: 'bg-accent-500',
+    gradient: 'from-accent-700 via-accent-600 to-accent-400',
+    soft: 'from-accent-50 to-accent-100/60 dark:from-accent-500/10 dark:to-accent-500/5'
   }
 };
 
@@ -51,7 +51,7 @@ export const CATEGORIES = [
 
 export const LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'All levels'];
 
-export const LANGUAGES = ['English', 'Bangla', 'Hindi', 'Urdu'];
+export const LANGUAGES = ['English', 'Bangla', 'Urdu'];
 
 export const COUNTRIES = ['Bangladesh', 'India', 'Pakistan'];
 

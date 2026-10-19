@@ -12,7 +12,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
     return (
       <div className="container-page section">
         <div className="card mx-auto max-w-xl p-8 text-center">
-          <ShieldAlert className="mx-auto h-10 w-10 text-amber-500" />
+          <ShieldAlert className="mx-auto h-10 w-10 text-amber-500 dark:text-amber-400" />
           <h1 className="mt-4 font-display text-2xl font-semibold text-ink">{t('auth.configTitle')}</h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t('auth.configText')}</p>
         </div>
@@ -36,7 +36,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
     return (
       <div className="container-page section">
         <div className="card mx-auto max-w-xl p-8 text-center">
-          <ShieldAlert className="mx-auto h-10 w-10 text-red-500" />
+          <ShieldAlert className="mx-auto h-10 w-10 text-red-500 dark:text-red-400" />
           <h1 className="mt-4 font-display text-2xl font-semibold text-ink">{t('admin.notAuthorized')}</h1>
         </div>
       </div>

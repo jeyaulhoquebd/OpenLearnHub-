@@ -41,14 +41,14 @@ export default function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 rounded-full border border-sand-300 bg-white p-1 pe-3 text-sm font-semibold text-ink shadow-sm transition hover:border-brand-300"
+        className="flex items-center gap-2 rounded-full border border-sand-300 bg-surface p-1 pe-3 text-sm font-semibold text-ink shadow-sm transition hover:border-brand-300"
         aria-haspopup="menu"
         aria-expanded={open}
       >
         {photoURL ? (
           <img src={photoURL} alt="" className="h-8 w-8 rounded-full object-cover" referrerPolicy="no-referrer" />
         ) : (
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-800 text-xs font-bold text-white">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white">
             {initials(displayName)}
           </span>
         )}
@@ -58,7 +58,7 @@ export default function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute end-0 mt-2 w-64 origin-top overflow-hidden rounded-2xl border border-sand-200 bg-white p-2 shadow-float animate-fade-up"
+          className="absolute end-0 mt-2 w-64 origin-top overflow-hidden rounded-2xl border border-sand-200 bg-surface p-2 shadow-float animate-fade-up"
         >
           <div className="border-b border-sand-100 px-3 py-2.5">
             <p className="truncate text-sm font-semibold text-ink">{displayName}</p>
@@ -97,7 +97,7 @@ export default function UserMenu() {
             type="button"
             role="menuitem"
             onClick={handleSignOut}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium text-red-600 transition hover:bg-red-50"
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
           >
             <LogOut className="h-4 w-4" />
             {t('common.signOut')}

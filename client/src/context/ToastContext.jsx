@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Info, X, XCircle } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -10,18 +11,19 @@ const ICONS = {
 };
 
 const STYLES = {
-  success: 'border-brand-200 bg-white text-ink',
-  error: 'border-red-200 bg-white text-ink',
-  info: 'border-slate-200 bg-white text-ink'
+  success: 'border-brand-200 bg-surface text-ink',
+  error: 'border-red-200 bg-surface text-ink dark:border-red-500/40',
+  info: 'border-sand-200 bg-surface text-ink'
 };
 
 const ICON_STYLES = {
   success: 'text-brand-600',
-  error: 'text-red-500',
-  info: 'text-slate-500'
+  error: 'text-red-500 dark:text-red-400',
+  info: 'text-ink-muted'
 };
 
 export function ToastProvider({ children }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState([]);
 
   const dismiss = useCallback((id) => {
@@ -65,7 +67,7 @@ export function ToastProvider({ children }) {
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 className="rounded-full p-1 text-ink-muted transition hover:bg-sand-100 hover:text-ink"
-                aria-label="Dismiss notification"
+                aria-label={t('common.dismiss')}
               >
                 <X className="h-4 w-4" />
               </button>

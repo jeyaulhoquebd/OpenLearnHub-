@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Menu, Plus, Sparkles, X } from 'lucide-react';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
+import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 import { useAuth } from '../context/AuthContext';
 
@@ -51,7 +52,7 @@ export default function Header() {
     >
       <a
         href="#main"
-        className="absolute -top-16 start-4 z-[60] rounded-full bg-brand-900 px-4 py-2 text-xs font-semibold text-white transition focus:top-3"
+        className="absolute -top-16 start-4 z-[60] rounded-full bg-navy-900 px-4 py-2 text-xs font-semibold text-white transition focus:top-3"
       >
         Skip to content
       </a>
@@ -67,6 +68,7 @@ export default function Header() {
         </nav>
 
         <div className="hidden items-center gap-2.5 xl:flex">
+          <ThemeToggle />
           <LanguageSwitcher />
           {user ? (
             <>
@@ -90,12 +92,13 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2 xl:hidden">
+          <ThemeToggle />
           <LanguageSwitcher compact />
           {user && <UserMenu />}
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="grid h-10 w-10 place-items-center rounded-full border border-sand-300 bg-white text-ink shadow-sm"
+            className="grid h-10 w-10 place-items-center rounded-full border border-sand-300 bg-surface text-ink shadow-sm"
             aria-expanded={open}
             aria-controls="mobile-menu"
             aria-label={open ? t('common.close') : t('nav.menu')}
@@ -106,7 +109,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <div id="mobile-menu" className="border-t border-sand-200 bg-white xl:hidden">
+        <div id="mobile-menu" className="border-t border-sand-200 bg-surface xl:hidden">
           <nav className="container-page flex flex-col gap-1 py-4" aria-label="Mobile">
             {navItems.map((item) => (
               <NavLink

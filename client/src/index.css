@@ -5,6 +5,67 @@
 @layer base {
   :root {
     color-scheme: light;
+
+    /* Neutrals */
+    --sand-50: 250 251 253;
+    --sand-100: 242 245 249;
+    --sand-200: 230 234 241;
+    --sand-300: 211 218 230;
+
+    --ink: 11 31 75;
+    --ink-soft: 58 74 107;
+    --ink-muted: 100 116 139;
+
+    --surface: 255 255 255;
+    --surface-raised: 255 255 255;
+    --surface-muted: 247 249 252;
+
+    /* Brand tints (soft in light mode) */
+    --brand-50: 237 243 255;
+    --brand-100: 219 231 254;
+    --brand-200: 191 211 252;
+    --brand-300: 147 180 248;
+    --brand-400: 96 144 242;
+    --brand-500: 59 111 232;
+    --brand-600: 36 84 196;
+    --brand-700: 27 63 155;
+    --brand-800: 22 51 122;
+    --brand-900: 11 31 75;
+    --brand-950: 7 20 51;
+
+    --grid-line: 11 31 75;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --sand-50: 11 18 32;
+    --sand-100: 20 28 48;
+    --sand-200: 35 46 72;
+    --sand-300: 51 64 94;
+
+    --ink: 234 240 250;
+    --ink-soft: 194 205 227;
+    --ink-muted: 147 163 191;
+
+    --surface: 20 28 48;
+    --surface-raised: 26 35 58;
+    --surface-muted: 15 23 41;
+
+    /* Brand tints invert so text stays readable and tints stay subtle. */
+    --brand-50: 16 31 61;
+    --brand-100: 22 41 76;
+    --brand-200: 34 54 95;
+    --brand-300: 42 71 120;
+    --brand-400: 62 99 168;
+    --brand-500: 91 130 214;
+    --brand-600: 124 156 230;
+    --brand-700: 163 185 240;
+    --brand-800: 196 211 247;
+    --brand-900: 226 234 251;
+    --brand-950: 242 246 254;
+
+    --grid-line: 226 234 251;
   }
 
   html {
@@ -18,26 +79,22 @@
   }
 
   body.lang-bangla {
-    font-family: 'Noto Sans Bengali', 'Plus Jakarta Sans', sans-serif;
-  }
-
-  body:lang(hi) {
-    font-family: 'Noto Sans Devanagari', 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Noto Sans Bengali', Inter, sans-serif;
   }
 
   body.lang-urdu,
   [dir='rtl'] body {
-    font-family: 'Noto Nastaliq Urdu', 'Plus Jakarta Sans', serif;
+    font-family: 'Noto Nastaliq Urdu', Inter, serif;
     line-height: 2.1;
   }
 
   [dir='rtl'] .font-display {
-    font-family: 'Noto Nastaliq Urdu', Fraunces, serif;
+    font-family: 'Noto Nastaliq Urdu', Inter, serif;
   }
 
   ::selection {
-    background-color: #abeed7;
-    color: #032923;
+    background-color: rgb(var(--brand-300));
+    color: rgb(var(--brand-950));
   }
 
   :focus-visible {
@@ -53,7 +110,7 @@
 
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: #0d8a70;
+    accent-color: #7c3aed;
   }
 }
 
@@ -71,7 +128,7 @@
   }
 
   .display-title {
-    @apply font-display text-3xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-4xl lg:text-5xl;
+    @apply font-display text-3xl font-bold leading-[1.08] tracking-tight text-ink sm:text-4xl lg:text-5xl;
   }
 
   .btn {
@@ -79,15 +136,15 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-800 text-white shadow-soft hover:bg-brand-900 hover:shadow-float active:scale-[0.98];
+    @apply btn bg-navy-900 text-white shadow-soft hover:bg-navy-800 hover:shadow-float active:scale-[0.98] dark:bg-accent-600 dark:hover:bg-accent-500;
   }
 
   .btn-accent {
-    @apply btn bg-coral-500 text-white shadow-soft hover:bg-coral-600 active:scale-[0.98];
+    @apply btn bg-accent-500 text-white shadow-soft hover:bg-accent-600 active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply btn border border-sand-300 bg-white text-ink hover:border-brand-300 hover:bg-brand-50/60 active:scale-[0.98];
+    @apply btn border border-sand-300 bg-surface text-ink hover:border-brand-300 hover:bg-brand-50/60 active:scale-[0.98];
   }
 
   .btn-ghost {
@@ -107,19 +164,19 @@
   }
 
   .input {
-    @apply w-full rounded-2xl border border-sand-300 bg-white px-4 py-3 text-sm text-ink shadow-sm transition placeholder:text-ink-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25;
+    @apply w-full rounded-2xl border border-sand-300 bg-surface px-4 py-3 text-sm text-ink shadow-sm transition placeholder:text-ink-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25;
   }
 
   .input-error {
-    @apply border-red-300 focus:border-red-500 focus:ring-red-500/20;
+    @apply border-red-300 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500/50;
   }
 
   .field-error {
-    @apply mt-1.5 text-xs font-medium text-red-600;
+    @apply mt-1.5 text-xs font-medium text-red-600 dark:text-red-400;
   }
 
   .card {
-    @apply rounded-3xl border border-sand-200 bg-white shadow-card;
+    @apply rounded-3xl border border-sand-200 bg-surface shadow-card;
   }
 
   .card-hover {
@@ -144,14 +201,14 @@
 
   .skeleton::after {
     content: '';
-    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent;
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/10;
     animation: shimmer 1.6s infinite;
   }
 
   .bg-grid {
     background-image:
-      linear-gradient(to right, rgba(12, 73, 63, 0.055) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(12, 73, 63, 0.055) 1px, transparent 1px);
+      linear-gradient(to right, rgb(var(--grid-line) / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-line) / 0.06) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 

@@ -30,7 +30,11 @@
     "browseAll": "تمام وسائل دیکھیں",
     "verified": "تصدیق شدہ",
     "results": "{{count}} وسائل",
-    "oneResult": "{{count}} وسیلہ"
+    "oneResult": "{{count}} وسیلہ",
+    "dismiss": "اطلاع بند کریں",
+    "theme": "تھیم",
+    "switchToDark": "ڈارک موڈ پر جائیں",
+    "switchToLight": "لائٹ موڈ پر جائیں"
   },
   "type": {
     "course": "کورس",
@@ -180,7 +184,8 @@
     "underReview": "جائزے کے منتظر",
     "legalOfficial": "قانونی اور سرکاری ماخذ",
     "viewLicense": "لائسنس دیکھیں",
-    "communitySubmission": "کمیونٹی جمع شدہ"
+    "communitySubmission": "کمیونٹی جمع شدہ",
+    "officialDownload": "سرکاری ڈاؤن لوڈ"
   },
   "auth": {
     "loginTitle": "خوش آمدید۔",
@@ -226,7 +231,11 @@
     "weakPassword": "مضبوط پاس ورڈ منتخب کریں (8+ حروف)۔",
     "popupClosed": "Google سائن اِن مکمل ہونے سے پہلے بند ہو گیا۔",
     "popupBlocked": "براؤزر نے سائن اِن پاپ اپ روکا۔ پاپ اپ کی اجازت دے کر دوبارہ کوشش کریں۔",
-    "passwordResetSuccess": "ری سیٹ لنک کے لیے اپنا اِن باکس دیکھیں۔"
+    "passwordResetSuccess": "ری سیٹ لنک کے لیے اپنا اِن باکس دیکھیں۔",
+    "asideTitle": "علم ایک حق ہے،",
+    "asideTitleAccent": "پے وال نہیں۔",
+    "asideText": "بنگلہ دیش، بھارت اور پاکستان کے سیکھنے والے مفت اور قانونی وسائل سے اپنا اگلا باب بنا رہے ہیں۔",
+    "asideTrust": "ڈیزائن سے ہی 100% قانونی"
   },
   "submit": {
     "eyebrow": "کمیونٹی کا تعاون",
@@ -468,6 +477,14 @@
     "previewBadge": "پری ویو موڈ",
     "previewTitle": "Firebase ابھی کنفیگر نہیں",
     "previewText": "آپ سیڈ شدہ لائبریری دیکھ سکتے ہیں۔ سائن اِن، محفوظ کرنا، جمع کرنا اور ماڈریشن کے لیے Firebase environment variables درکار ہیں۔",
-    "dismiss": "بند کریں"
+    "dismiss": "بند کریں",
+    "hide": "چھپائیں",
+    "details": "تفصیلات",
+    "missing": "غائب:"
+  },
+  "errors": {
+    "title": "کچھ غلط ہو گیا",
+    "text": "یہ صفحہ دکھاتے وقت غیر متوقع خرابی پیش آئی۔ دوبارہ لوڈ کرنے سے عام طور پر ٹھیک ہو جاتا ہے۔",
+    "reload": "OpenLearn Hub دوبارہ لوڈ کریں"
   }
 }

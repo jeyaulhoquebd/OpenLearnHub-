@@ -82,11 +82,11 @@ export default function ReportModal({ open, onClose, resource }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="report-title"
-        className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-sand-200 bg-white p-6 shadow-float animate-fade-up sm:rounded-3xl"
+        className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-sand-200 bg-surface p-6 shadow-float animate-fade-up sm:rounded-3xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">
               <ShieldAlert className="h-5 w-5" />
             </span>
             <div>
@@ -174,7 +174,7 @@ export default function ReportModal({ open, onClose, resource }) {
             </div>
 
             {errorMessage && (
-              <p className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <p className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 {errorMessage}
               </p>

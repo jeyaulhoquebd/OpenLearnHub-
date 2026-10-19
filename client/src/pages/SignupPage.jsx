@@ -176,7 +176,7 @@ export default function SignupPage() {
           </label>
 
           {error && (
-            <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
               {error}
             </p>
           )}

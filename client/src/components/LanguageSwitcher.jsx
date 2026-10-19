@@ -1,12 +1,6 @@
 import { Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English', short: 'EN' },
-  { code: 'bn', label: 'বাংলা', short: 'বাং' },
-  { code: 'hi', label: 'हिन्दी', short: 'हि' },
-  { code: 'ur', label: 'اردو', short: 'اردو' }
-];
+import { SUPPORTED_LANGUAGES } from '../lib/i18n';
 
 export default function LanguageSwitcher({ compact = false }) {
   const { i18n, t } = useTranslation();
@@ -18,11 +12,11 @@ export default function LanguageSwitcher({ compact = false }) {
       <select
         value={i18n.language?.slice(0, 2) || 'en'}
         onChange={(event) => i18n.changeLanguage(event.target.value)}
-        className={`cursor-pointer appearance-none rounded-full border border-sand-300 bg-white py-2 pe-8 ps-9 text-xs font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+        className={`cursor-pointer appearance-none rounded-full border border-sand-300 bg-surface py-2 pe-8 ps-9 text-xs font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
           compact ? 'w-[4.5rem]' : ''
         }`}
       >
-        {LANGUAGES.map((language) => (
+        {SUPPORTED_LANGUAGES.map((language) => (
           <option key={language.code} value={language.code}>
             {compact ? language.short : language.label}
           </option>

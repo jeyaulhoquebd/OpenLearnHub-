@@ -15,15 +15,15 @@ export default function LegalLayout({ title, subtitle, children }) {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/40 pb-10 pt-10">
+      <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-brand-50 via-sand-50 to-amber-50/40 pb-10 pt-10 dark:to-accent-500/10">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-25" />
         <div className="container-page relative">
           <span className="eyebrow">
-            <span className="h-px w-7 bg-brand-500" />
+            <span className="h-px w-7 bg-navy-500" />
             {t('footer.legal')}
           </span>
           <div className="mt-4 flex items-start gap-4">
-            <span className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-900 text-white sm:grid">
+            <span className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl bg-navy-900 text-white sm:grid">
               <Scale className="h-5 w-5" />
             </span>
             <div>
@@ -40,7 +40,7 @@ export default function LegalLayout({ title, subtitle, children }) {
       <section className="container-page py-10 sm:py-14">
         <div className="grid gap-9 lg:grid-cols-[15rem_1fr] xl:grid-cols-[17rem_1fr]">
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <nav className="rounded-3xl border border-sand-200 bg-white p-4 shadow-sm" aria-label={t('footer.legal')}>
+            <nav className="rounded-3xl border border-sand-200 bg-surface p-4 shadow-sm" aria-label={t('footer.legal')}>
               <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-muted">
                 {t('footer.legal')}
               </p>

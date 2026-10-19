@@ -27,11 +27,28 @@ export function initials(name = '') {
 }
 
 export function monogram(value = '') {
-  const cleaned = value.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+  const text = localized(value);
+  const cleaned = text.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
   if (!cleaned) return 'OL';
   const words = cleaned.split(/\s+/).filter(Boolean);
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return words.slice(0, 2).map((word) => word[0].toUpperCase()).join('');
+}
+
+/**
+ * Resource titles/descriptions may be stored as per-language maps
+ * ({ en, bn, ur }) or as plain strings (legacy/seed data). This resolves
+ * either shape to a single string, falling back to English.
+ */
+export function localized(value, language = 'en') {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value !== 'object') return String(value);
+  const lang = String(language || 'en').slice(0, 2);
+  const candidate = value[lang] || value.en;
+  if (typeof candidate === 'string' && candidate.trim()) return candidate;
+  const fallback = Object.values(value).find((entry) => typeof entry === 'string' && entry.trim());
+  return fallback || '';
 }
 
 export function truncate(value = '', length = 160) {

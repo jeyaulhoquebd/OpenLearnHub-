@@ -82,7 +82,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-sand-200 bg-gradient-to-r from-brand-900 to-brand-700 px-4 py-3.5 text-white">
+      <div className="flex items-center justify-between gap-3 border-b border-sand-200 bg-gradient-to-r from-navy-900 to-navy-700 px-4 py-3.5 text-white">
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/15 ring-1 ring-inset ring-white/25">
             <Sparkles className="h-4 w-4" />
@@ -141,7 +141,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
         <>
           <div ref={scrollRef} className={`flex-1 space-y-4 overflow-y-auto bg-sand-50/60 p-4 ${heightClass}`}>
             {messages.length === 0 && (
-              <div className="rounded-2xl border border-sand-200 bg-white p-4">
+              <div className="rounded-2xl border border-sand-200 bg-surface p-4">
                 <div className="flex items-center gap-2 text-brand-800">
                   <Bot className="h-4 w-4" />
                   <p className="text-xs font-bold uppercase tracking-wider">{t('assistant.name')}</p>
@@ -169,7 +169,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
               >
                 <span
                   className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full ${
-                    message.role === 'user' ? 'bg-ink text-white' : 'bg-brand-800 text-white'
+                    message.role === 'user' ? 'bg-ink text-white' : 'bg-navy-800 text-white'
                   }`}
                 >
                   {message.role === 'user' ? <UserRound className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
@@ -179,7 +179,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
                     className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                       message.role === 'user'
                         ? 'bg-ink text-white'
-                        : 'border border-sand-200 bg-white text-ink-soft'
+                        : 'border border-sand-200 bg-surface text-ink-soft'
                     }`}
                   >
                     {message.content}
@@ -195,7 +195,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
                           href={source.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-start gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-xs font-medium text-brand-800 transition hover:border-brand-300"
+                          className="flex items-start gap-2 rounded-xl border border-sand-200 bg-surface px-3 py-2 text-xs font-medium text-brand-800 transition hover:border-brand-300"
                         >
                           <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span className="line-clamp-2">{source.title}</span>
@@ -209,10 +209,10 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
 
             {sending && (
               <div className="flex items-center gap-2.5 text-sm text-ink-muted">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-800 text-white">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-navy-800 text-white">
                   <Bot className="h-3.5 w-3.5" />
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-2xl border border-sand-200 bg-white px-3.5 py-2.5">
+                <span className="inline-flex items-center gap-2 rounded-2xl border border-sand-200 bg-surface px-3.5 py-2.5">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
                   {t('assistant.thinking')}
                 </span>
@@ -220,13 +220,13 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
             )}
 
             {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
                 {error}
               </div>
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="border-t border-sand-200 bg-white p-3">
+          <form onSubmit={handleSubmit} className="border-t border-sand-200 bg-surface p-3">
             <div className="flex items-end gap-2">
               <textarea
                 value={input}

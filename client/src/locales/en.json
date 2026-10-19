@@ -30,7 +30,11 @@
     "browseAll": "Browse all resources",
     "verified": "Verified",
     "results": "{{count}} resources",
-    "oneResult": "{{count}} resource"
+    "oneResult": "{{count}} resource",
+    "dismiss": "Dismiss notification",
+    "theme": "Theme",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode"
   },
   "type": {
     "course": "Course",
@@ -180,7 +184,8 @@
     "underReview": "Awaiting review",
     "legalOfficial": "Legal & official source",
     "viewLicense": "View licence",
-    "communitySubmission": "Community submission"
+    "communitySubmission": "Community submission",
+    "officialDownload": "Official download"
   },
   "auth": {
     "loginTitle": "Welcome back.",
@@ -226,7 +231,11 @@
     "weakPassword": "Please choose a stronger password (8+ characters).",
     "popupClosed": "Google sign-in was closed before completing.",
     "popupBlocked": "Your browser blocked the sign-in popup. Please allow popups and try again.",
-    "passwordResetSuccess": "Check your inbox for the reset link."
+    "passwordResetSuccess": "Check your inbox for the reset link.",
+    "asideTitle": "Knowledge is a right,",
+    "asideTitleAccent": "not a paywall.",
+    "asideText": "Join learners across Bangladesh, India, and Pakistan using free, legal resources to build their next chapter.",
+    "asideTrust": "100% legal by design"
   },
   "submit": {
     "eyebrow": "Community contributions",
@@ -468,6 +477,14 @@
     "previewBadge": "Preview mode",
     "previewTitle": "Firebase isn't configured yet",
     "previewText": "You can browse the seeded library. Sign-in, saving, submissions, and moderation need Firebase environment variables.",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "hide": "Hide",
+    "details": "Details",
+    "missing": "Missing:"
+  },
+  "errors": {
+    "title": "Something went wrong",
+    "text": "An unexpected error occurred while rendering this page. Reloading usually fixes it.",
+    "reload": "Reload OpenLearn Hub"
   }
 }
