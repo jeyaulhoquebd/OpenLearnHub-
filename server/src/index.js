@@ -36,13 +36,15 @@ app.use(
       }
       return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
     },
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400
   })
 );
 
-app.use(express.json({ limit: '64kb' }));
+// Import batches can carry up to 400 resources; the file itself is capped at
+// 2 MB in the browser and every field is bounded again by zod on the server.
+app.use(express.json({ limit: '2mb' }));
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
 const globalLimiter = rateLimit({
@@ -69,7 +71,19 @@ app.get('/', (req, res) => {
       '/api/ai/chat',
       '/api/ai/roadmap',
       '/api/admin/me',
-      '/api/admin/settings/ai/status'
+      '/api/admin/stats',
+      '/api/admin/resources',
+      '/api/admin/categories',
+      '/api/admin/alternatives',
+      '/api/admin/users',
+      '/api/admin/reviews',
+      '/api/admin/reports',
+      '/api/admin/check-links',
+      '/api/admin/import',
+      '/api/admin/import-export/export/resources',
+      '/api/admin/audit-logs',
+      '/api/admin/settings/ai/status',
+      '/api/admin/settings/site'
     ]
   });
 });

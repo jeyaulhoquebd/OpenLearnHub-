@@ -26,6 +26,20 @@ service firebase.storage {
       allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
+    // Admin-managed resource thumbnails (the /admin/resources editor).
+    // The browser resizes to 800 px and re-encodes as WebP under 1 MB before
+    // uploading; the rules enforce the same limits server-side.
+    match /thumbnails/admin/{userId}/{fileName} {
+      allow read: if true;
+
+      allow create, update: if
+        isAdmin() &&
+        request.resource.size < 1024 * 1024 &&
+        request.resource.contentType.matches('image/(webp|jpeg|png)');
+
+      allow delete: if isAdmin();
+    }
+
     // Everything else is denied.
     match /{allPaths=**} {
       allow read, write: if false;

@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchAdminCounts } from '../lib/data';
 
+/** Fired after an admin action so the shell's badges reload. */
+export const ADMIN_COUNTS_REFRESH_EVENT = 'openlearn:admin-counts-refresh';
+
+/**
+ * Asks the mounted `useAdminCounts` instance (in AdminLayout) to reload.
+ * Pages dispatch this after resolving reports or flagging resources, so the
+ * sidebar and notification bell update without a full page reload.
+ */
+export function refreshAdminCounts() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(ADMIN_COUNTS_REFRESH_EVENT));
+}
+
 /**
  * Loads the small counters used across the admin shell (open reports badge,
  * dashboard stat cards). Failures are non-fatal: the panel keeps working with
@@ -29,6 +42,14 @@ export function useAdminCounts({ enabled = true } = {}) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Let pages request a badge refresh after a mutation.
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const handler = () => refresh();
+    window.addEventListener(ADMIN_COUNTS_REFRESH_EVENT, handler);
+    return () => window.removeEventListener(ADMIN_COUNTS_REFRESH_EVENT, handler);
+  }, [enabled, refresh]);
 
   return { counts, loading, error, refresh };
 }

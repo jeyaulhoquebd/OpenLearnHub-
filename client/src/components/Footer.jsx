@@ -1,13 +1,48 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Mail, ShieldCheck } from 'lucide-react';
+import {
+  Facebook,
+  Github,
+  Globe,
+  Instagram,
+  Linkedin,
+  Mail,
+  ShieldCheck,
+  Twitter,
+  Youtube
+} from 'lucide-react';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useSiteSettings } from '../context/SiteSettingsContext';
+
+const SOCIAL_ICONS = {
+  facebook: Facebook,
+  twitter: Twitter,
+  instagram: Instagram,
+  youtube: Youtube,
+  linkedin: Linkedin,
+  github: Github,
+  website: Globe
+};
+
+const SOCIAL_LABELS = {
+  facebook: 'Facebook',
+  twitter: 'X / Twitter',
+  instagram: 'Instagram',
+  youtube: 'YouTube',
+  linkedin: 'LinkedIn',
+  github: 'GitHub',
+  website: 'Website'
+};
 
 export default function Footer() {
   const { t } = useTranslation();
-  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
+  const { settings } = useSiteSettings();
+  const contactEmail =
+    settings.contactEmail || import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
+  const legalEmail =
+    settings.legalEmail || import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
+  const socialLinks = Object.entries(settings.socialLinks || {}).filter(([, url]) => Boolean(url));
 
   const columns = [
     {
@@ -66,6 +101,27 @@ export default function Footer() {
                 {contactEmail}
               </a>
             </div>
+
+            {socialLinks.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {socialLinks.map(([key, url]) => {
+                  const Icon = SOCIAL_ICONS[key] || Globe;
+                  return (
+                    <a
+                      key={key}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={SOCIAL_LABELS[key] || key}
+                      title={SOCIAL_LABELS[key] || key}
+                      className="grid h-8 w-8 place-items-center rounded-full border border-sand-300 bg-surface text-ink-soft transition hover:border-brand-300 hover:text-brand-800"
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {columns.map((column) => (

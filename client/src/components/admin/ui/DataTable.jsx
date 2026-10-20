@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDown,
@@ -43,6 +43,9 @@ export default function DataTable({
   columns = [],
   rows = [],
   rowKey = (row) => row.id,
+  rowClassName,
+  renderExpandedRow,
+  expandedRowKeys = [],
   loading = false,
   skeletonRows = 5,
   emptyTitle,
@@ -184,33 +187,42 @@ export default function DataTable({
             ) : (
               rows.map((row, index) => {
                 const id = rowKey(row);
+                const expanded = Boolean(renderExpandedRow) && expandedRowKeys.includes(id);
                 return (
-                  <tr
-                    key={id || index}
-                    className={`transition hover:bg-sand-50 ${
-                      selected.has(id) ? 'bg-accent-50/60 dark:bg-accent-500/5' : ''
-                    }`}
-                  >
-                    {selectable && (
-                      <td className="px-4 py-3">
-                        <Checkbox
-                          checked={selected.has(id)}
-                          onChange={(next) => toggleOne(id, next)}
-                          label={t('admin.ui.selectRow')}
-                        />
-                      </td>
+                  <Fragment key={id || index}>
+                    <tr
+                      className={`transition hover:bg-sand-50 ${
+                        selected.has(id) ? 'bg-accent-50/60 dark:bg-accent-500/5' : ''
+                      } ${rowClassName ? rowClassName(row) : ''}`}
+                    >
+                      {selectable && (
+                        <td className="px-4 py-3">
+                          <Checkbox
+                            checked={selected.has(id)}
+                            onChange={(next) => toggleOne(id, next)}
+                            label={t('admin.ui.selectRow')}
+                          />
+                        </td>
+                      )}
+                      {columns.map((column) => (
+                        <td
+                          key={column.key}
+                          className={`px-4 py-3 align-middle text-ink-soft ${
+                            column.align === 'end' ? 'text-end' : 'text-start'
+                          } ${column.className || ''}`}
+                        >
+                          {column.render ? column.render(row, index) : row[column.key] ?? '—'}
+                        </td>
+                      ))}
+                    </tr>
+                    {expanded && (
+                      <tr className="bg-sand-50/80 dark:bg-white/[0.02]">
+                        <td colSpan={columnCount} className="px-4 py-4">
+                          {renderExpandedRow(row)}
+                        </td>
+                      </tr>
                     )}
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={`px-4 py-3 align-middle text-ink-soft ${
-                          column.align === 'end' ? 'text-end' : 'text-start'
-                        } ${column.className || ''}`}
-                      >
-                        {column.render ? column.render(row, index) : row[column.key] ?? '—'}
-                      </td>
-                    ))}
-                  </tr>
+                  </Fragment>
                 );
               })
             )}

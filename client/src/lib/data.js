@@ -142,17 +142,32 @@ export async function fetchCategories() {
   }
 }
 
+/**
+ * Public list of paid → free pairs for the home page.
+ *
+ * Rows are curated in the admin panel, so this only returns the ones an admin
+ * has left active, sorted by their manual `order`. Legacy rows without an
+ * `active` field are treated as active.
+ */
 export async function fetchAlternatives() {
+  const byOrder = (a, b) => (Number(a.order) || 0) - (Number(b.order) || 0);
+
   if (!db) {
-    return demoAlternatives.map((item) => ({ ...item }));
+    return demoAlternatives
+      .map((item) => ({ ...item }))
+      .sort(byOrder);
   }
+
   try {
     const snap = await getDocs(collection(db, 'alternatives'));
-    const items = snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
-    return items.length ? items : demoAlternatives;
+    const items = snap.docs
+      .map((entry) => ({ id: entry.id, ...entry.data() }))
+      .filter((item) => item.active !== false)
+      .sort(byOrder);
+    return items.length ? items : demoAlternatives.slice().sort(byOrder);
   } catch (error) {
     console.warn('[alternatives]', error);
-    return demoAlternatives;
+    return demoAlternatives.slice().sort(byOrder);
   }
 }
 
@@ -295,6 +310,10 @@ export async function fetchReviews(resourceId) {
     query(
       collection(db, 'reviews'),
       where('resourceId', '==', resourceId),
+      // Hidden reviews are only readable by their author (security rules), so
+      // the public list has to ask for visible rows explicitly. This composite
+      // filter is declared in firebase/firestore.indexes.json.
+      where('hidden', '==', false),
       limit(100)
     )
   );
@@ -336,6 +355,9 @@ export async function saveReview({ resourceId, uid, authorName, rating, body }) 
       // `comment` is kept in sync for the documented data model.
       body: text,
       comment: text,
+      // Moderation state is public-readable; only the admin API may flip it
+      // (security rules pin it to its previous value on author updates).
+      hidden: existing.exists() ? existing.data().hidden === true : false,
       createdAt: existing.exists() ? existing.data().createdAt || serverTimestamp() : serverTimestamp(),
       updatedAt: serverTimestamp()
     },
@@ -531,15 +553,6 @@ export async function updateResourceStatus({ id, status, reviewerUid, reviewNote
   await updateDoc(doc(db, 'resources', id), payload);
 }
 
-export async function markReportResolved({ id, reviewerUid }) {
-  if (!db) throw new Error('Firebase is not configured.');
-  await updateDoc(doc(db, 'reports', id), {
-    status: 'resolved',
-    resolvedBy: reviewerUid,
-    resolvedAt: serverTimestamp()
-  });
-}
-
 export async function fetchAdminCounts() {
   if (!db) return { resources: demoResources.length, pending: 0, reports: 0 };
   const [publishedSnap, pendingSnap, reportsSnap] = await Promise.all([
@@ -666,6 +679,7 @@ export function getRelatedResources(resources, resource, count = 3) {
 export function getAlternativesWithResources(alternatives, resources) {
   const byId = new Map(resources.map((resource) => [resource.id, resource]));
   return alternatives
+    .filter((alternative) => alternative.active !== false)
     .map((alternative) => ({
       ...alternative,
       freeResource: byId.get(alternative.freeAlternativeResourceId) || null

@@ -76,15 +76,18 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ---------- categories & alternatives (admin-managed) ----------
+    // ---------- categories & alternatives (server-managed) ----------
+    // Reads are public; writes go exclusively through the admin API, which
+    // validates input, keeps slugs/order consistent and writes an audit entry.
+    // Direct browser writes are denied even for admins.
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if false;
     }
 
     match /alternatives/{alternativeId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if false;
     }
 
     // ---------- user profiles ----------
@@ -161,15 +164,20 @@ service cloud.firestore {
     }
 
     // ---------- reviews ----------
-    // Anyone can read published reviews. Signed-in, email-verified users may
-    // post exactly one review per resource, edit it, or delete their own.
+    // Visible reviews are public. Hidden reviews are only readable by their
+    // author (so their own review still renders) and by admins; the public list
+    // query must include `where('hidden', '==', false)`. Signed-in, verified
+    // users may post one review per resource, edit it, or delete their own.
     match /reviews/{reviewId} {
-      allow read: if true;
+      allow read: if
+        resource.data.get('hidden', false) == false ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
 
       allow create: if
         isSignedIn() &&
         request.auth.token.email_verified == true &&
         request.resource.data.userId == request.auth.uid &&
+        request.resource.data.hidden == false &&
         reviewId == ownedDocId(request.resource.data.resourceId, request.auth.uid) &&
         request.resource.data.rating is number &&
         request.resource.data.rating >= 1 &&
@@ -177,17 +185,30 @@ service cloud.firestore {
         isNonEmptyString(request.resource.data.body) &&
         request.resource.data.body.size() <= 2000;
 
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Authors can edit their text/rating but can never change `hidden`; only
+      // the admin API (Admin SDK) may hide or restore a review.
+      allow update: if
+        isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.get('hidden', false) == resource.data.get('hidden', false) &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        isNonEmptyString(request.resource.data.body) &&
+        request.resource.data.body.size() <= 2000;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ---------- reports ----------
     // Reports are created by the Express API with the Admin SDK (which bypasses
-    // these rules), so the public client can never write here. Admins review
-    // reports from the moderation dashboard.
+    // these rules), so the public client can never write here. Admin moderation
+    // (status, notes, unpublish) also goes through the API so every change is
+    // audited; clients only read the queue for counters and the dashboard.
     match /reports/{reportId} {
       allow read: if isAdmin();
-      allow create: if false;
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if false;
     }
 
     // ---------- audit trail (server-only) ----------
@@ -198,10 +219,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---------- site settings (public read, server write) ----------
+    // The public layout reads the announcement banner and maintenance switch
+    // directly from settings/site. Only the Express API may write it.
+    match /settings/site {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ---------- server-only settings ----------
     // The Gemini API key and model live in settings/ai and are written by the
     // Express API with the Admin SDK (which bypasses these rules). Clients can
-    // never read or write anything under settings/.
+    // never read or write any other settings document.
     match /settings/{documentId} {
       allow read, write: if false;
     }

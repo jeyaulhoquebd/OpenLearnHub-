@@ -1,14 +1,19 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useSiteSettings } from '../context/SiteSettingsContext';
+import { localized } from '../lib/utils';
 
 export default function Logo({ className = '', compact = false, to = '/' }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { settings } = useSiteSettings();
+  const siteName = settings.siteName || t('common.appName');
+  const tagline = localized(settings.tagline, i18n.language) || t('common.tagline');
 
   return (
     <Link
       to={to}
       className={`group inline-flex items-center gap-2.5 rounded-xl ${className}`}
-      aria-label={compact ? t('common.appName') : undefined}
+      aria-label={compact ? siteName : undefined}
     >
       <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-navy-900 shadow-soft transition group-hover:scale-[1.04]">
         <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
@@ -22,10 +27,10 @@ export default function Logo({ className = '', compact = false, to = '/' }) {
       {!compact && (
         <span className="hidden flex-col leading-none min-[380px]:flex">
           <span className="font-display text-lg font-semibold tracking-tight text-ink">
-            {t('common.appName')}
+            {siteName}
           </span>
           <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-700">
-            {t('common.tagline')}
+            {tagline}
           </span>
         </span>
       )}

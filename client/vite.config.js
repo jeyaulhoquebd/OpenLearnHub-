@@ -36,7 +36,10 @@ export default defineConfig({
           if (id.includes('lucide-react')) return 'icons';
           if (id.includes('i18next')) return 'i18n';
           if (id.includes('react-router')) return 'router';
-          if (id.includes('react')) return 'react';
+          // Charts are only pulled in by the lazy admin dashboard, so keep them
+          // out of the shared vendor chunk (and out of the react chunk below).
+          if (id.includes('recharts') || id.includes('victory-vendor')) return 'charts';
+          if (/node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
           return 'vendor';
         },
       },

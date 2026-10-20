@@ -6,6 +6,7 @@ import AdminRoute from './components/admin/AdminRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoader } from './components/LoadingStates';
 import { AuthProvider } from './context/AuthContext';
+import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import HomePage from './pages/HomePage';
@@ -30,6 +31,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const AdminResourcesPage = lazy(() => import('./pages/admin/AdminResourcesPage'));
+const AdminResourceFormPage = lazy(() => import('./pages/admin/AdminResourceFormPage'));
 const AdminCategoriesPage = lazy(() => import('./pages/admin/AdminCategoriesPage'));
 const AdminAlternativesPage = lazy(() => import('./pages/admin/AdminAlternativesPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
@@ -51,8 +53,9 @@ export default function App() {
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
-            <ToastProvider>
-              <Routes>
+            <SiteSettingsProvider>
+              <ToastProvider>
+                <Routes>
                 {/*
                   The admin panel lives outside the public <Layout /> on purpose:
                   it has its own sidebar/top bar and no marketing header, footer
@@ -69,6 +72,11 @@ export default function App() {
                 >
                   <Route index element={withSuspense(<AdminDashboardPage />)} />
                   <Route path="resources" element={withSuspense(<AdminResourcesPage />)} />
+                  <Route path="resources/new" element={withSuspense(<AdminResourceFormPage />)} />
+                  <Route
+                    path="resources/:id/edit"
+                    element={withSuspense(<AdminResourceFormPage />)}
+                  />
                   <Route path="categories" element={withSuspense(<AdminCategoriesPage />)} />
                   <Route path="alternatives" element={withSuspense(<AdminAlternativesPage />)} />
                   <Route path="users" element={withSuspense(<AdminUsersPage />)} />
@@ -119,8 +127,9 @@ export default function App() {
                   />
                   <Route path="*" element={withSuspense(<NotFoundPage />)} />
                 </Route>
-              </Routes>
-            </ToastProvider>
+                </Routes>
+              </ToastProvider>
+            </SiteSettingsProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

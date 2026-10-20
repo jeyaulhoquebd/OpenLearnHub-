@@ -61,8 +61,14 @@ function cleanDetails(details) {
 /**
  * Writes one audit entry.
  *
+ * The email/name are denormalised into the entry so the audit log screen can
+ * show "who" even if the Auth account is later deleted. Older entries only have
+ * a UID; the audit-log API enriches those with a best-effort Auth lookup.
+ *
  * @param {object} entry
  * @param {string} entry.adminUid  UID of the administrator who acted.
+ * @param {string} [entry.adminEmail] Email captured at action time.
+ * @param {string} [entry.adminName] Display name captured at action time.
  * @param {string} entry.action    Dotted action name, e.g. "resource.publish".
  * @param {string} [entry.targetType] Collection or domain, e.g. "resource".
  * @param {string} [entry.targetId]   Document id or other identifier.
@@ -71,6 +77,8 @@ function cleanDetails(details) {
  */
 export async function writeAuditLog({
   adminUid,
+  adminEmail = null,
+  adminName = null,
   action,
   targetType = null,
   targetId = null,
@@ -85,6 +93,8 @@ export async function writeAuditLog({
   try {
     const ref = await db.collection('auditLogs').add({
       adminUid: clean(adminUid, 128) || 'unknown',
+      adminEmail: clean(adminEmail, 200),
+      adminName: clean(adminName, 120),
       action: clean(action, 80) || 'unknown',
       targetType: clean(targetType, 60),
       targetId: clean(targetId, MAX_STRING),
@@ -103,5 +113,10 @@ export async function writeAuditLog({
  * verified `req.user` populated by requireAdmin.
  */
 export function writeAuditLogForRequest(req, entry = {}) {
-  return writeAuditLog({ ...entry, adminUid: entry.adminUid || req.user?.uid });
+  return writeAuditLog({
+    ...entry,
+    adminUid: entry.adminUid || req.user?.uid,
+    adminEmail: entry.adminEmail || req.user?.email || null,
+    adminName: entry.adminName || req.user?.name || null
+  });
 }

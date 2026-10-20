@@ -13,6 +13,20 @@ export function formatDate(value, locale = 'en') {
   }).format(date);
 }
 
+/** Same as formatDate, with the time of day (link-check timestamps). */
+export function formatDateTime(value, locale = 'en') {
+  if (!value) return '—';
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
 export function formatNumber(value, locale = 'en') {
   return new Intl.NumberFormat(locale).format(value);
 }

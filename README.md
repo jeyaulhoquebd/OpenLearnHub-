@@ -41,7 +41,7 @@ OpenLearn Hub lists free courses, lawfully available books (open textbooks, publ
 - **Accounts** with email/password, Google, GitHub, and Apple sign-in (Firebase Auth).
 - **Personal dashboard** with saved resources, progress, review history, submissions, and account settings.
 - **Community submissions** that enter a moderation queue (`status: "pending"`).
-- **Admin dashboard** for approving/rejecting submissions and resolving reports.
+- **Admin dashboard** for approving/rejecting submissions, a reports queue with legal-priority highlighting and one-click unpublish, plus a link checker that flags dead official links.
 - **Report this resource** on every card and detail page for copyright, piracy, broken-link, and accuracy issues.
 - **LearnMate**, an AI study guide whose key lives only on the server and which is grounded in the curated library.
 - **Three languages** — English, Bangla, and Urdu (RTL). Hindi can be added later without restructuring.
@@ -391,12 +391,12 @@ data keeps rendering during the migration.
 
 | Collection | Read | Write |
 | --- | --- | --- |
-| `categories/{id}` | public | admins only |
-| `alternatives/{id}` | public | admins only |
+| `categories/{id}` | public | **Express API only** (Admin SDK) |
+| `alternatives/{id}` | public | **Express API only** (Admin SDK) |
 | `bookmarks/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
 | `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
-| `reviews/{resourceId_userId}` | public | verified, signed-in owner (one review per resource) |
-| `reports/{id}` | admins | **created by the Express API only** |
+| `reviews/{resourceId_userId}` | public (hidden reviews: author/admin only) | verified, signed-in owner (one review per resource); `hidden` is server-only |
+| `reports/{id}` | admins | **Express API only** (Admin SDK) |
 | `roadmaps/{id}` | owner | owner (bounded content, no updates) |
 | `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; daily AI quota) |
 | `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
@@ -408,8 +408,8 @@ data keeps rendering during the migration.
 
 ### `reports/{reportId}`
 
-- Readable and updatable by admins only.
-- **Writes are disabled for clients** (`allow create: if false`). Reports are created by the Express API using the Admin SDK, which validates the payload and bypasses rules. This prevents spam and forged reports.
+- Readable by admins (the shell counter and dashboard feed).
+- **All writes are server-only** (`allow create, update, delete: if false`). Reports are created by the public `POST /api/reports` endpoint, and moderation (status, admin note, unpublish) goes through `/api/admin/reports` so every change is validated and audited.
 - Signed-in reporters must have a verified email; anonymous copyright notices are still accepted and stored with `verifiedReporter: false`.
 
 ### `settings/ai` (server-only)
@@ -441,7 +441,7 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 - Roadmaps: owner-only read/delete; create limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps).
 - Reviews: verified email required, one per resource, owner-only edits.
 - `settings/*`: completely denied to clients (the server's Admin SDK writes it).
-- Storage: images under 2 MB, thumbnail paths only; admins may write anywhere.
+- Storage: images under 2 MB for community thumbnails (`thumbnails/{uid}/…`) and images under 1 MB (WebP/JPEG/PNG) for admin resource thumbnails (`thumbnails/admin/{uid}/…`, admin claim only).
 - Default deny for everything else.
 
 ## API
@@ -456,9 +456,45 @@ Base URL: `http://localhost:8080` in development.
 | `POST` | `/api/ai/chat` | Firebase ID token | LearnMate reply grounded in curated resources |
 | `POST` | `/api/ai/roadmap` | Firebase ID token + verified email | Structured study roadmap grounded in curated resources (hourly + daily limits) |
 | `GET` | `/api/admin/me` | Admin claim | Confirms the caller's admin claim and returns basic profile fields |
+| `GET` | `/api/admin/stats` | Admin claim | Dashboard aggregates: counts, 30-day series, top resources, latest reports/reviews, auth provider split (cached 60s, `?refresh=1` bypasses) |
+| `GET` | `/api/admin/resources` | Admin claim | Resource list: `q`, `type`, `status`, `category`, `language`, `sort`, `cursor`, `limit` |
+| `POST` | `/api/admin/resources` | Admin claim | Create a resource (validated, blocklisted, unique slug, audited) |
+| `PUT` | `/api/admin/resources/:id` | Admin claim | Update a resource (regenerates the slug when the English title changes) |
+| `DELETE` | `/api/admin/resources/:id` | Admin claim | Delete a resource |
+| `POST` | `/api/admin/resources/bulk` | Admin claim | Publish/draft/flag/delete up to 100 ids in one batch |
+| `POST` | `/api/admin/resources/test-link` | Admin claim | SSRF-safe link reachability check |
 | `GET` | `/api/admin/settings/ai/status` | Admin claim | Masked AI configuration status (never returns the key) |
 | `POST` | `/api/admin/settings/ai` | Admin claim | Store/clear the encrypted Gemini key + model |
 | `POST` | `/api/admin/settings/ai/test` | Admin claim | Verify a candidate or active key with a minimal Gemini call |
+| `GET` | `/api/admin/categories` | Admin claim | Categories with resource counts and order |
+| `POST` | `/api/admin/categories` | Admin claim | Create a category (unique slug, icon whitelist, audited) |
+| `PUT` | `/api/admin/categories/:id` | Admin claim | Update a category; renaming the English name moves its resources |
+| `DELETE` | `/api/admin/categories/:id` | Admin claim | Delete an empty category (`409 category_in_use` otherwise) |
+| `POST` | `/api/admin/categories/reorder` | Admin claim | Persist the drag-and-drop order |
+| `POST` | `/api/admin/categories/:id/move-resources` | Admin claim | Move resources to another category (used by the delete flow) |
+| `GET` | `/api/admin/alternatives` | Admin claim | Paid → free software pairs, ordered |
+| `POST` | `/api/admin/alternatives` | Admin claim | Create a pair (paid and free must be published software resources) |
+| `PUT` | `/api/admin/alternatives/:id` | Admin claim | Update a pair (duplicate pairs rejected) |
+| `DELETE` | `/api/admin/alternatives/:id` | Admin claim | Delete a pair |
+| `POST` | `/api/admin/alternatives/reorder` | Admin claim | Persist order |
+| `POST` | `/api/admin/alternatives/:id/active` | Admin claim | Show/hide a pair on the public home page |
+| `GET` | `/api/admin/users` | Admin claim | Auth users merged with Firestore profiles: `pageToken`, `search`, `verified`, `provider`, `admin`, `disabled` |
+| `GET` | `/api/admin/users/:uid` | Admin claim | Account detail plus bookmark/review/progress counts |
+| `POST` | `/api/admin/users/:uid/disable`, `/enable` | Admin claim | Toggle sign-in access |
+| `POST` | `/api/admin/users/:uid/make-admin`, `/remove-admin` | Admin claim | Set the `admin` claim (self and last-admin guards) |
+| `POST` | `/api/admin/users/:uid/revoke-sessions` | Admin claim | Revoke refresh tokens everywhere |
+| `DELETE` | `/api/admin/users/:uid` | Admin claim | Delete Auth + profile/bookmarks/progress and anonymise reviews (email confirmation required) |
+| `GET` | `/api/admin/reviews` | Admin claim | Moderation queue: `q`, `resourceId`, `rating`, `cursor`, `limit` (hidden included) |
+| `POST` | `/api/admin/reviews/:id/hide`, `/show` | Admin claim | Toggle visibility and recompute the resource rating in a transaction |
+| `DELETE` | `/api/admin/reviews/:id` | Admin claim | Delete a review and recompute the rating |
+| `POST` | `/api/admin/reviews/bulk` | Admin claim | `{ ids, action }` for up to 100 reviews |
+| `GET` | `/api/admin/reports` | Admin claim | Report queue with `status`, `reason` (`illegal`/`broken`/`other` or an exact reason), `resourceId` and `q`; illegal reports sorted first, including similar-report counts |
+| `PATCH` | `/api/admin/reports/:id` | Admin claim | `{ status?, adminNote? }` — move a report between statuses and/or save an internal note |
+| `POST` | `/api/admin/reports/:id/unpublish-resource` | Admin claim | Flag the reported resource and resolve the report in one transaction |
+| `GET` | `/api/admin/check-links/results` | Admin claim | Saved `linkCheck` results, summary counts, last full check time and the running-job summary |
+| `POST` | `/api/admin/check-links` | Admin claim | Start a background job; `{ ids }` checks selected resources, omit it for the whole library (409 when a job is running) |
+| `GET` | `/api/admin/check-links/:jobId` | Admin claim | Live job progress and completed rows |
+| `POST` | `/api/admin/check-links/recheck` | Admin claim | `{ id }` — synchronously re-check one resource and save the result |
 
 ### `POST /api/reports`
 
@@ -612,10 +648,15 @@ Admin access comes **only** from the `admin: true` custom claim (set with `scrip
 
 | Route | Screen |
 | --- | --- |
-| `/admin` | Dashboard: library counters, submission queue, report queue, admin-access card |
-| `/admin/resources`, `/admin/categories`, `/admin/alternatives` | Content tools (next step) |
-| `/admin/users`, `/admin/reviews`, `/admin/reports` | Community tools (next step) |
-| `/admin/link-checker`, `/admin/import-export` | Maintenance tools (next step) |
+| `/admin` | Dashboard: headline metrics with 7-day trends, 30-day sign-up/resource charts, type and provider donuts, top viewed/saved, latest reports and reviews with quick actions, submission queue |
+| `/admin/resources` | Resource library: search, type/status/category/language filters, sortable columns, row selection + bulk publish/draft/flag/delete, row menu (edit, duplicate, view, publish, delete) |
+| `/admin/resources/new`, `/admin/resources/:id/edit` | Five-section editor (basic info, multilingual content, source, thumbnail, publishing) with a live public-card preview |
+| `/admin/categories`, `/admin/alternatives` | Categories (courses/books/software tabs, drag-and-drop order, icon picker) and paid → free software pairs |
+| `/admin/users` | Accounts: search and filters, verification/provider badges, detail drawer with disable, admin claim, session revoke and typed-email deletion |
+| `/admin/reviews` | Moderation: search + rating filters, hide/show/delete (single and bulk), detail modal, automatic rating recalculation |
+| `/admin/reports` | Reports queue: board/table views, illegal-first priority, reason/status/search filters, detail drawer with admin note, status changes and one-click unpublish |
+| `/admin/link-checker` | Maintenance: full or selected background link checks, live progress, result filters/sort, per-row re-check and bulk flagging of broken links |
+| `/admin/import-export` | Maintenance tool (next step) |
 | `/admin/ai` | AI Settings — store the encrypted Gemini key (working today) |
 | `/admin/settings`, `/admin/audit-log` | Site settings and the read-only action trail |
 
@@ -623,6 +664,18 @@ Admin access comes **only** from the `admin: true` custom claim (set with `scrip
 - **Shell:** `components/admin/AdminLayout.jsx` renders a collapsible sidebar (state kept in `localStorage`), a mobile drawer, breadcrumbs, theme and language switches, a report counter, and the account menu. Every admin screen is `React.lazy`-loaded.
 - **UI kit:** `components/admin/ui/` provides `PageHeader`, `StatCard`, `DataTable`, `ConfirmDialog`, `Modal`, `Drawer`, `StatusBadge`, `SearchInput`, `FormField`, `ImageUploader`, `Tabs` and the shared toast hook.
 - **Audit trail:** `server/src/lib/audit.js` appends every privileged action to the server-only `auditLogs` collection. Entries are never readable from a browser, and failed logging never breaks the action itself.
+- **Stats:** `GET /api/admin/stats` (Admin SDK) returns counts via Firestore `count()` aggregations, 30-day series, top resources, latest activity and the auth-provider split (up to 5,000 accounts, marked approximate past the cap). The response is cached in memory for 60 seconds; the dashboard's **Refresh** button sends `?refresh=1` to bypass the cache.
+- **Charts:** the dashboard uses `recharts` (its own `charts` chunk, loaded only with `/admin`). Series colours follow the navy → purple ramp, while axes and grids read CSS variables so light and dark mode need no re-render. In Urdu the time axes are reversed and the Y axis moves to the right.
+- **Resources CRUD:** all writes go through `/api/admin/resources` (never direct Firestore writes from the panel), so one server-side zod schema, the unique-slug generator, the piracy blocklist (`server/config/blocklist.js`) and the audit log apply to every save. Software listings must have a licence and an official `sourceUrl`; known piracy domains, crack keywords and third-party software mirrors are rejected with a `422` explaining the match.
+- **List search:** Firestore cannot substring-search three language fields, so the list endpoint applies equality filters in Firestore and search/language/sort in memory over the 500 most recently updated matches. The opaque cursor is an offset into that filtered set; the UI warns when the scan cap is reached.
+- **Test link:** `POST /api/admin/resources/test-link` performs an SSRF-safe reachability check (public http/https only, DNS + every redirect validated, 7 s timeout) and reports the final status.
+- **Categories & alternatives:** both collections are **server-write-only** (rules deny every client write), so ordering, slug uniqueness and the icon whitelist cannot be bypassed. Deleting a category that still has resources returns `409 category_in_use`; the UI offers a "move resources, then delete" flow instead. Resources store the English category **name**, so renaming a category moves its resources in the same request.
+- **Users:** the list merges Firebase Auth (identity, providers, disabled flag, metadata, claims) with `users/{uid}` (profile fields). Privileges are claim-only. The API refuses to remove your own admin claim, refuses to demote/delete the last administrator, and deletion requires typing the account email. Deletion removes the Auth user, profile, bookmarks and progress, while reviews are kept and anonymised so ratings stay honest.
+- **Reviews:** hide/show/delete runs in a Firestore transaction that re-queries the resource's reviews and rewrites `ratingAvg`/`ratingCount`, so cards and filters stay in sync. Hidden reviews are excluded by the security rules; the public review query filters `hidden == false` (composite index in `firebase/firestore.indexes.json`). Authors cannot change the `hidden` flag themselves.
+- **Reports queue:** a bounded scan (500 reports) supports reason groups (`illegal` = copyright/piracy, `broken`, `other`), status, resource and free-text filters. Copyright/piracy reports always sort first and are highlighted. The drawer saves the note and status in one PATCH; unpublishing flags the resource and resolves the report transactionally. Every write is audited and dispatches a shell-counter refresh, so the sidebar and bell badges update immediately.
+- **Link checker:** `POST /api/admin/check-links` starts an in-memory job (one at a time), checks with HEAD → GET fallback, a 10-second budget, at most 5 redirects, concurrency 5 and the same SSRF rules as the resource form. Results are written to `resources/{id}.linkCheck` (`ok`, `statusCode`, `finalUrl`, `checkedAt`, `error`, redirect metadata). A full check also stores `settings/linkChecker.lastFullCheckAt`; the client polls job progress, then reloads the saved rows. Broken/timed-out rows can be selected and bulk-flagged through the existing resource bulk endpoint.
+- **Thumbnails:** the browser resizes to 800 px, re-encodes as WebP and keeps the file under 1 MB before uploading to `thumbnails/admin/{uid}/…`; storage rules allow only admin-claimed accounts to write there.
+- **Note:** resource `viewCount` / `saveCount` are stored and sorted, but nothing increments them yet, so the "most viewed" and "most saved" lists show zeros on a freshly seeded library.
 
 ## Translations and RTL
 
