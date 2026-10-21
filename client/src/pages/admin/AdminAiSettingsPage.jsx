@@ -352,7 +352,7 @@ export default function AdminAiSettingsPage() {
                   value={model}
                   onChange={(event) => setModel(event.target.value)}
                   maxLength={120}
-                  placeholder="llama-3.3-70b-versatile"
+                  placeholder="qwen/qwen3.8-27b"
                   className="input font-mono text-sm"
                 />
               ) : (

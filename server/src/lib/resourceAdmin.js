@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { sanitizeText } from './validation.js';
+import {
+  YOUTUBE_PLAYLIST_ID_RE,
+  parseYouTubePlaylistId,
+  youtubePlaylistUrl
+} from './youtube.js';
 
 /**
  * Shared rules for the admin resources API.
@@ -77,6 +82,16 @@ export const resourceInputSchema = z
 
     sourceName: z.string().trim().min(2).max(160),
     sourceUrl: httpUrl(600),
+    youtubePlaylistId: z
+      .string()
+      .trim()
+      .max(600)
+      .optional()
+      .default('')
+      .transform((value) => parseYouTubePlaylistId(value) || value)
+      .refine((value) => !value || YOUTUBE_PLAYLIST_ID_RE.test(value), {
+        message: 'Enter a valid YouTube playlist URL or playlist ID.'
+      }),
 
     license: z.string().trim().min(2).max(160),
     licenseUrl: optionalHttpUrl(600),
@@ -114,6 +129,18 @@ export const resourceInputSchema = z
         message: 'Add a licence name before linking to its text.'
       });
     }
+
+    // On-site YouTube playback is only meaningful for courses. This also
+    // catches an admin pasting a playlist URL into the generic source field
+    // while the resource is still marked as a book or software listing.
+    const playlistId = parseYouTubePlaylistId(value.youtubePlaylistId || value.sourceUrl);
+    if (playlistId && value.type !== 'course') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['youtubePlaylistId'],
+        message: 'YouTube playlists can only be attached to course resources.'
+      });
+    }
   });
 
 /** Removes empty language keys so stored maps stay small and clean. */
@@ -139,6 +166,14 @@ export function normalizeResourceInput(input) {
     )
   ).slice(0, 10);
 
+  // Accept either an explicit playlist id or a playlist URL in the source
+  // field. The canonical playlist URL is stored so the "open on YouTube" link
+  // is stable even if the admin pasted a watch URL with extra parameters.
+  const youtubePlaylistId = parseYouTubePlaylistId(input.youtubePlaylistId || input.sourceUrl);
+  const sourceUrl = youtubePlaylistId
+    ? youtubePlaylistUrl(youtubePlaylistId)
+    : sanitizeText(input.sourceUrl, { max: 600 });
+
   return {
     type: input.type,
     category: sanitizeText(input.category, { max: 60 }),
@@ -152,7 +187,8 @@ export function normalizeResourceInput(input) {
     description: cleanTextMap(input.description, { max: 2000, multiline: true }),
 
     sourceName: sanitizeText(input.sourceName, { max: 160 }),
-    sourceUrl: sanitizeText(input.sourceUrl, { max: 600 }),
+    sourceUrl,
+    youtubePlaylistId: youtubePlaylistId || null,
 
     license: sanitizeText(input.license, { max: 160 }),
     licenseUrl: input.licenseUrl ? sanitizeText(input.licenseUrl, { max: 600 }) : null,
@@ -218,6 +254,7 @@ export const RESOURCE_LIST_FIELDS = [
   'thumbnailUrl',
   'sourceName',
   'sourceUrl',
+  'youtubePlaylistId',
   'viewCount',
   'saveCount',
   'ratingAvg',

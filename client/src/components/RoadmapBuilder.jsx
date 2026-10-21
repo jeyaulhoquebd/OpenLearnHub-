@@ -35,7 +35,7 @@ const OUTPUT_LANGUAGES = ['en', 'bn', 'ur'];
  */
 export default function RoadmapBuilder() {
   const { t, i18n } = useTranslation();
-  const { user, firebaseReady, isVerified } = useAuth();
+  const { user, firebaseReady, isVerified, loading } = useAuth();
   const { push } = useToast();
 
   const currentLanguage = OUTPUT_LANGUAGES.includes(i18n.language) ? i18n.language : 'en';
@@ -80,7 +80,7 @@ export default function RoadmapBuilder() {
   async function handleGenerate(event) {
     event.preventDefault();
     const trimmed = goal.trim();
-    if (trimmed.length < 4 || generating) return;
+    if (trimmed.length < 4 || generating || loading || !user) return;
 
     setGenerating(true);
     setError('');
@@ -135,6 +135,20 @@ export default function RoadmapBuilder() {
         <Route className="h-9 w-9 text-ink-muted" />
         <p className="text-sm font-semibold text-ink">{t('config.previewTitle')}</p>
         <p className="max-w-xs text-xs leading-relaxed text-ink-muted">{t('auth.configText')}</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="h-7 w-7 animate-spin text-brand-600" aria-hidden="true" />
+        <p className="text-sm font-semibold text-ink">{t('common.loading')}</p>
+        <p className="max-w-xs text-xs leading-relaxed text-ink-muted">{t('roadmap.subtitle')}</p>
       </div>
     );
   }

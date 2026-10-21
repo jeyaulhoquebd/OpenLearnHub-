@@ -14,7 +14,8 @@ import {
   Plus,
   RefreshCw,
   Rocket,
-  Trash2
+  Trash2,
+  Youtube
 } from 'lucide-react';
 import PageHeader from '../../components/admin/ui/PageHeader';
 import SearchInput from '../../components/admin/ui/SearchInput';
@@ -397,6 +398,12 @@ export default function AdminResourcesPage() {
               <p className="max-w-[16rem] truncate text-xs text-ink-muted">
                 {row.sourceName || row.slug || '—'}
               </p>
+              {row.youtubePlaylistId && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30">
+                  <Youtube className="h-2.5 w-2.5" aria-hidden="true" />
+                  {t('youtubeCourse.adminBadge')}
+                </span>
+              )}
             </div>
           </div>
         );
@@ -494,6 +501,10 @@ export default function AdminResourcesPage() {
               />
               {t('admin.resources.refresh')}
             </button>
+            <Link to="/admin/resources/new?youtube=1" className="btn-secondary">
+              <Youtube className="h-4 w-4" aria-hidden="true" />
+              {t('youtubeCourse.adminButton')}
+            </Link>
             <Link to="/admin/resources/new" className="btn-primary">
               <Plus className="h-4 w-4" aria-hidden="true" />
               {t('admin.resources.newResource')}

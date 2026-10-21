@@ -15,6 +15,7 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
+const CoursePlayerPage = lazy(() => import('./pages/CoursePlayerPage'));
 const SubmitResourcePage = lazy(() => import('./pages/SubmitResourcePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AssistantPage = lazy(() => import('./pages/AssistantPage'));
@@ -103,6 +104,7 @@ export default function App() {
                   <Route path="software" element={withSuspense(<ExplorePage fixedType="software" />)} />
                   <Route path="search" element={withSuspense(<SearchPage />)} />
                   <Route path="resource/:id" element={withSuspense(<ResourceDetailPage />)} />
+                  <Route path="course/:id" element={withSuspense(<CoursePlayerPage />)} />
                   <Route path="assistant" element={withSuspense(<AssistantPage />)} />
                   <Route path="about" element={withSuspense(<AboutPage />)} />
                   <Route path="contact" element={withSuspense(<ContactPage />)} />

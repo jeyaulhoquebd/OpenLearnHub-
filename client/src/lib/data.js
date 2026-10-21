@@ -19,6 +19,7 @@ import seedCategories from '../../../firebase/seed/categories.json';
 import seedAlternatives from '../../../firebase/seed/alternatives.json';
 import { db, storage } from './firebase';
 import { localized, normalizeTimestamp, safeFileName, slugify } from './utils';
+import { parseYouTubePlaylistId, youtubePlaylistUrl } from './youtube';
 
 export const isDemoMode = !db;
 
@@ -43,13 +44,19 @@ export function normalizeResource(raw) {
       ? raw.languages
       : [];
   const sourceName = raw.sourceName || raw.provider || '';
-  const sourceUrl = raw.sourceUrl || raw.url || '';
+  const rawSourceUrl = raw.sourceUrl || raw.url || '';
+  const youtubePlaylistId =
+    parseYouTubePlaylistId(raw.youtubePlaylistId) ||
+    parseYouTubePlaylistId(rawSourceUrl) ||
+    null;
+  const sourceUrl = youtubePlaylistId ? youtubePlaylistUrl(youtubePlaylistId) : rawSourceUrl;
 
   return {
     ...raw,
     id: raw.id,
     sourceName,
     sourceUrl,
+    youtubePlaylistId,
     // Legacy aliases kept so older components keep working.
     provider: sourceName,
     url: sourceUrl,

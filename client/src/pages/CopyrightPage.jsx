@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import LegalLayout from '../components/LegalLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { OWNER } from '../lib/owner';
 
 export default function CopyrightPage() {
   const { t } = useTranslation();
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
+  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
   usePageMeta(t('legal.copyrightTitle'), t('legal.copyrightSubtitle'));
 
   return (

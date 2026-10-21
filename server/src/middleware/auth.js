@@ -1,4 +1,4 @@
-import { getFirebaseAuth } from '../firebase.js';
+import { getFirebaseAuth, isFirebaseReady } from '../firebase.js';
 import { apiError } from '../lib/http.js';
 
 function readBearerToken(req) {
@@ -11,6 +11,7 @@ function readBearerToken(req) {
 async function verify(req) {
   const token = readBearerToken(req);
   if (!token) return { user: null, reason: 'missing_token' };
+  if (!isFirebaseReady()) return { user: null, reason: 'auth_unavailable' };
   const auth = getFirebaseAuth();
   if (!auth) return { user: null, reason: 'auth_unavailable' };
   try {

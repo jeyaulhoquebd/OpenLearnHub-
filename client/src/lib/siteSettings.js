@@ -14,8 +14,8 @@ export const DEFAULT_SITE_SETTINGS = {
     bn: 'সবার জন্য জ্ঞান',
     ur: 'سب کے لیے علم'
   },
-  contactEmail: 'hello@openlearnhub.org',
-  legalEmail: 'legal@openlearnhub.org',
+  contactEmail: 'jeyaulhoquejaber@gmail.com',
+  legalEmail: 'jeyaulhoquejaber@gmail.com',
   socialLinks: {
     facebook: '',
     twitter: '',
@@ -23,7 +23,7 @@ export const DEFAULT_SITE_SETTINGS = {
     youtube: '',
     linkedin: '',
     github: '',
-    website: ''
+    website: 'https://jeyaulhoque.pages.dev/'
   },
   announcement: {
     enabled: false,

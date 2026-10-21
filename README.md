@@ -4,10 +4,13 @@
 
 OpenLearn Hub lists free courses, lawfully available books (open textbooks, public-domain works, and author-approved free editions), and open-source software. It links out to official sources, never re-hosts copyrighted files, and never hosts installers.
 
+**Maintained by [Jeyaul Hoque](https://jeyaulhoque.pages.dev/)** · [jeyaulhoquejaber@gmail.com](mailto:jeyaulhoquejaber@gmail.com)
+
 ---
 
 ## Contents
 
+- [Maintainer](#maintainer)
 - [What it does](#what-it-does)
 - [Content and legal policy](#content-and-legal-policy)
 - [Preview mode (no Firebase needed)](#preview-mode-no-firebase-needed)
@@ -27,6 +30,15 @@ OpenLearn Hub lists free courses, lawfully available books (open textbooks, publ
 - [Scripts](#scripts)
 - [Troubleshooting](#troubleshooting)
 - [Legal checklist before launch](#legal-checklist-before-launch)
+
+---
+
+## Maintainer
+
+OpenLearn Hub is designed, built, and maintained by **Jeyaul Hoque**.
+
+- Website: [https://jeyaulhoque.pages.dev/](https://jeyaulhoque.pages.dev/)
+- Email: [jeyaulhoquejaber@gmail.com](mailto:jeyaulhoquejaber@gmail.com)
 
 ---
 
@@ -234,9 +246,9 @@ This writes the 35 records in `firebase/seed/resources.json` into the `resources
 ```bash
 # from the repository root — accepts a UID or an email address
 npm run set-admin -w server -- fEbrHXzHl2hkvo7wZQw9wzinMlx1
-npm run set-admin -w server -- you@example.com
+npm run set-admin -w server -- jeyaulhoquejaber@gmail.com
 # revoke admin access again
-npm run set-admin -w server -- you@example.com --remove
+npm run set-admin -w server -- jeyaulhoquejaber@gmail.com --remove
 # or run it directly: cd server && node scripts/set-admin.js <uid-or-email>
 ```
 
@@ -260,7 +272,7 @@ There are **two ways** to provide the key. A key stored from the admin panel alw
 
 ```dotenv
 GROQ_API_KEY=your-groq-api-key
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=qwen/qwen3.8-27b
 GROQ_TIMEOUT_MS=15000
 GROQ_MAX_OUTPUT_TOKENS=1024
 GROQ_ROADMAP_MAX_OUTPUT_TOKENS=2048
@@ -329,7 +341,7 @@ Leaving the six required Firebase values empty is supported and enables preview 
 | `FIREBASE_STORAGE_BUCKET` | No | Explicit storage bucket |
 | `ADMIN_EMAILS` | Optional | Default target email for `set-admin` when no argument is given |
 | `GROQ_API_KEY` | For LearnMate | Server-side Groq key (fallback when none is stored) |
-| `GROQ_MODEL` | No | Default `llama-3.3-70b-versatile` |
+| `GROQ_MODEL` | No | Default `qwen/qwen3.8-27b` |
 | `GROQ_TIMEOUT_MS` | No | Default `15000` |
 | `GROQ_MAX_OUTPUT_TOKENS` | No | Default `1024` |
 | `GROQ_ROADMAP_MAX_OUTPUT_TOKENS` | No | Default `2048` |
@@ -428,7 +440,7 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 ```jsonc
 {
   "provider": "groq",
-  "model": "llama-3.3-70b-versatile",
+  "model": "qwen/qwen3.8-27b",
   "apiKeyCiphertext": "…", // AES-256-GCM, base64
   "apiKeyIv": "…",
   "apiKeyTag": "…",
@@ -739,6 +751,12 @@ At least one `VITE_FIREBASE_*` value is missing. Copy `client/.env.example` to `
 
 **Reports or LearnMate return "Something went wrong".**
 The API is not running or `VITE_API_URL` points to the wrong host. Check `http://localhost:8080/api/health`. In preview mode these features are expected to fail softly.
+
+**LearnMate says "AI is not configured" even though `GROQ_API_KEY` is set.**
+Put `GROQ_API_KEY` and `SETTINGS_ENCRYPTION_KEY` in `server/.env`, not `client/.env`. Vite only exposes `VITE_*` variables to the browser, so a non-prefixed key in `client/.env` is invisible to the Express server (and should never live there). Restart the API after editing the file. AI endpoints also require Firebase Admin credentials; without them the API returns `auth_unavailable` before it can reach Groq.
+
+**Groq returns `404` / "model not found".**
+The configured model has been retired by Groq. Check the current list at https://console.groq.com/docs/models, then set `GROQ_MODEL` in `server/.env` or update it in Admin → AI Settings. The old default `llama-3.3-70b-versatile` is no longer available; this project now defaults to `qwen/qwen3.8-27b`.
 
 **`/admin` says "not authorized".**
 Sign out and back in after running `set-admin` so the custom claim is refreshed. Confirm `users/{uid}.role` is `admin`.

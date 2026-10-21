@@ -14,6 +14,7 @@ import {
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { OWNER } from '../lib/owner';
 
 const SOCIAL_ICONS = {
   facebook: Facebook,
@@ -39,9 +40,9 @@ export default function Footer() {
   const { t } = useTranslation();
   const { settings } = useSiteSettings();
   const contactEmail =
-    settings.contactEmail || import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
+    settings.contactEmail || import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
   const legalEmail =
-    settings.legalEmail || import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
+    settings.legalEmail || import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
   const socialLinks = Object.entries(settings.socialLinks || {}).filter(([, url]) => Boolean(url));
 
   const columns = [
@@ -122,6 +123,32 @@ export default function Footer() {
                 })}
               </div>
             )}
+
+            <div className="mt-5 rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
+                {t('owner.label')}
+              </p>
+              <p className="mt-1 font-display text-lg font-semibold text-ink">{OWNER.name}</p>
+              <p className="text-xs text-ink-muted">{t('owner.role')}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a
+                  href={OWNER.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-sand-300 bg-surface px-3 py-1.5 text-[11px] font-semibold text-ink-soft transition hover:border-brand-300 hover:text-brand-800"
+                >
+                  <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('owner.websiteLabel')}
+                </a>
+                <a
+                  href={`mailto:${OWNER.email}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-sand-300 bg-surface px-3 py-1.5 text-[11px] font-semibold text-ink-soft transition hover:border-brand-300 hover:text-brand-800"
+                >
+                  <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('owner.emailLabel')}
+                </a>
+              </div>
+            </div>
           </div>
 
           {columns.map((column) => (
@@ -147,6 +174,17 @@ export default function Footer() {
           <div className="space-y-1.5">
             <p className="text-xs text-ink-muted">{t('footer.madeFor')}</p>
             <p className="text-xs text-ink-muted">{t('footer.disclaimer')}</p>
+            <p className="text-xs text-ink-muted">
+              {t('owner.footer', { name: OWNER.name })}{' '}
+              <a
+                href={OWNER.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-brand-700 hover:text-brand-900"
+              >
+                {t('owner.websiteLabel')}
+              </a>
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <LanguageSwitcher />

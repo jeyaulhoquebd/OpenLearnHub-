@@ -13,10 +13,11 @@ import {
 } from 'lucide-react';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { COUNTRY_FLAGS } from '../lib/constants';
+import { OWNER } from '../lib/owner';
 
 export default function AboutPage() {
   const { t } = useTranslation();
-  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
+  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
   usePageMeta(t('about.title'), t('about.subtitle'));
 
   const standards = [
@@ -144,6 +145,38 @@ export default function AboutPage() {
               {t('assistant.name')}
               <ArrowUpRight className="h-4 w-4" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="section bg-surface">
+        <div className="container-page">
+          <div className="grid gap-6 rounded-[2rem] border border-sand-200 bg-sand-50/60 p-7 sm:p-9 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <span className="eyebrow">
+                <span className="h-px w-7 bg-navy-500" />
+                {t('owner.label')}
+              </span>
+              <h2 className="mt-3 font-display text-3xl font-semibold text-ink">{OWNER.name}</h2>
+              <p className="mt-1 text-sm font-semibold text-brand-700">{t('owner.role')}</p>
+              <p className="mt-4 max-w-2xl text-[15px] leading-7 text-ink-soft">{t('owner.aboutText')}</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+              <a
+                href={OWNER.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary justify-center"
+              >
+                <Globe2 className="h-4 w-4" />
+                {t('owner.websiteLabel')}
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+              <a href={`mailto:${OWNER.email}`} className="btn-secondary justify-center">
+                <Mail className="h-4 w-4" />
+                {t('owner.emailLabel')}
+              </a>
+            </div>
           </div>
         </div>
       </section>

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { initFirebase, getDb } from '../src/firebase.js';
+import { initFirebase, getDb, isFirebaseReady } from '../src/firebase.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const seedDir = path.resolve(__dirname, '../../firebase/seed');
@@ -82,8 +82,8 @@ async function seedCollection(db, name, items) {
 async function main() {
   initFirebase();
   const db = getDb();
-  if (!db) {
-    console.error('[seed] Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS.');
+  if (!db || !isFirebaseReady()) {
+    console.error('[seed] Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS in server/.env.');
     process.exit(1);
   }
 

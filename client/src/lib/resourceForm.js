@@ -6,6 +6,7 @@ import {
   PLATFORMS,
   RESOURCE_TYPES
 } from './constants';
+import { parseYouTubePlaylistId, youtubePlaylistUrl } from './youtube';
 
 /**
  * Form model for the admin resource editor.
@@ -130,6 +131,16 @@ export const resourceFormSchema = z.object({
     .trim()
     .max(600, 'admin.resources.form.errors.tooLong')
     .refine(isHttpUrl, 'admin.resources.form.errors.url'),
+  youtubePlaylistUrl: z
+    .string()
+    .trim()
+    .max(600, 'admin.resources.form.errors.tooLong')
+    .optional()
+    .default('')
+    .refine(
+      (value) => !value || Boolean(parseYouTubePlaylistId(value)),
+      'youtubeCourse.playlistInvalid'
+    ),
 
   thumbnailUrl: optionalHttpUrl(800),
 
@@ -156,6 +167,7 @@ export const EMPTY_RESOURCE_FORM = {
   description_ur: '',
   sourceName: '',
   sourceUrl: '',
+  youtubePlaylistUrl: '',
   thumbnailUrl: '',
   status: 'draft',
   featured: false
@@ -212,6 +224,9 @@ export function resourceToFormValues(resource = {}) {
     description_ur: description.ur || '',
     sourceName: resource.sourceName || resource.provider || '',
     sourceUrl: resource.sourceUrl || resource.url || '',
+    youtubePlaylistUrl: resource.youtubePlaylistId
+      ? youtubePlaylistUrl(resource.youtubePlaylistId)
+      : '',
     thumbnailUrl: resource.thumbnailUrl || '',
     status: RESOURCE_FORM_STATUSES.includes(resource.status) ? resource.status : 'draft',
     featured: Boolean(resource.featured)
@@ -229,6 +244,10 @@ function compactMap(values) {
 
 /** Form values → the JSON body expected by the admin API. */
 export function toResourcePayload(values) {
+  const youtubePlaylistId =
+    parseYouTubePlaylistId(values.youtubePlaylistUrl) ||
+    parseYouTubePlaylistId(values.sourceUrl);
+
   return {
     type: values.type,
     category: values.category,
@@ -248,7 +267,10 @@ export function toResourcePayload(values) {
       ur: values.description_ur
     }),
     sourceName: values.sourceName,
-    sourceUrl: values.sourceUrl,
+    sourceUrl: youtubePlaylistId
+      ? youtubePlaylistUrl(youtubePlaylistId)
+      : values.sourceUrl,
+    youtubePlaylistId: youtubePlaylistId || '',
     license: values.license,
     licenseUrl: values.licenseUrl || '',
     author: values.author || '',

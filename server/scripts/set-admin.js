@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { config } from '../src/config.js';
-import { getDb, getFirebaseAuth, initFirebase } from '../src/firebase.js';
+import { getDb, getFirebaseAuth, initFirebase, isFirebaseReady } from '../src/firebase.js';
 import { writeAuditLog } from '../src/lib/audit.js';
 
 /**
@@ -62,7 +62,7 @@ async function main() {
   const auth = getFirebaseAuth();
   const db = getDb();
 
-  if (!auth) {
+  if (!auth || !db || !isFirebaseReady()) {
     console.error(
       '[set-admin] Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON, ' +
         'or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, then try again.'

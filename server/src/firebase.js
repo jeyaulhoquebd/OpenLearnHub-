@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -80,8 +83,46 @@ export function getStorageBucket() {
   return storage;
 }
 
+function adcFileExists() {
+  const candidates = [
+    process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    path.join(os.homedir(), '.config', 'gcloud', 'application_default_credentials.json'),
+    process.env.APPDATA
+      ? path.join(process.env.APPDATA, 'gcloud', 'application_default_credentials.json')
+      : ''
+  ].filter(Boolean);
+
+  return candidates.some((candidate) => {
+    try {
+      return fs.existsSync(candidate);
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * True when the server has enough information to authenticate with Firebase
+ * Admin. This is stricter than `Boolean(db && auth)` because the Admin SDK
+ * creates objects even when Application Default Credentials are missing; in
+ * that state every real request would fail or hang.
+ */
+export function hasFirebaseAdminCredentials() {
+  const { serviceAccountJson, projectId, clientEmail, privateKey } = config.firebase;
+  if (serviceAccountJson) return true;
+  if (projectId && clientEmail && privateKey) return true;
+  if (adcFileExists()) return true;
+
+  // Managed Google runtimes inject credentials through the metadata server.
+  if (process.env.K_SERVICE || process.env.GAE_ENV || process.env.FUNCTION_TARGET) {
+    return true;
+  }
+
+  return false;
+}
+
 export function isFirebaseReady() {
-  return Boolean(db && auth);
+  return Boolean(db && auth && hasFirebaseAdminCredentials());
 }
 
 export function getFirebaseInitError() {

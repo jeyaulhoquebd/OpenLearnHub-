@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpRight, Flag, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Flag, Globe2, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { OWNER } from '../lib/owner';
 
 export default function ContactPage() {
   const { t } = useTranslation();
   usePageMeta(t('contact.title'), t('contact.subtitle'));
 
-  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
+  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
+  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
 
   const channels = [
     {
@@ -65,6 +66,41 @@ export default function ContactPage() {
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-3xl border border-sand-200 bg-surface shadow-card">
+          <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <span className="eyebrow">
+                <span className="h-px w-7 bg-navy-500" />
+                {t('owner.contactTitle')}
+              </span>
+              <h2 className="mt-3 font-display text-2xl font-semibold text-ink">{OWNER.name}</h2>
+              <p className="mt-1 text-sm font-semibold text-brand-700">{t('owner.role')}</p>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">
+                {t('owner.contactText')}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+              <a href={`mailto:${OWNER.email}`} className="btn-primary justify-center">
+                <Mail className="h-4 w-4" />
+                {t('owner.emailLabel')}
+              </a>
+              <a
+                href={OWNER.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary justify-center"
+              >
+                <Globe2 className="h-4 w-4" />
+                {t('owner.websiteLabel')}
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
+          <div className="border-t border-sand-100 bg-sand-50/70 px-6 py-3 text-xs font-medium text-ink-muted sm:px-8">
+            {OWNER.email} · {OWNER.website}
+          </div>
         </div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-2">

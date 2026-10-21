@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +21,8 @@ import {
   Rocket,
   Save,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Youtube
 } from 'lucide-react';
 import PageHeader from '../../components/admin/ui/PageHeader';
 import FormField from '../../components/admin/ui/FormField';
@@ -45,6 +46,7 @@ import {
   toResourcePayload
 } from '../../lib/resourceForm';
 import { prepareThumbnail, uploadThumbnail } from '../../lib/thumbnails';
+import { parseYouTubePlaylistId, youtubeEmbedUrl, youtubePlaylistUrl } from '../../lib/youtube';
 import { formatDate } from '../../lib/utils';
 
 const TYPE_ICONS = {
@@ -70,9 +72,9 @@ const LINK_ERROR_KEYS = {
   too_many_redirects: 'redirects'
 };
 
-function Section({ icon: Icon, title, description, children }) {
+function Section({ icon: Icon, title, description, children, id }) {
   return (
-    <section className="rounded-2xl border border-sand-200 bg-surface p-5 shadow-soft">
+    <section id={id} className="rounded-2xl border border-sand-200 bg-surface p-5 shadow-soft">
       <div className="mb-4 flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
           <Icon className="h-4 w-4" aria-hidden="true" />
@@ -129,6 +131,8 @@ export default function AdminResourceFormPage() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const youtubeIntent = !isEdit && searchParams.get('youtube') === '1';
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { push } = useToast();
@@ -159,6 +163,48 @@ export default function AdminResourceFormPage() {
   });
 
   const values = watch();
+  const youtubePlaylistId = useMemo(
+    () =>
+      parseYouTubePlaylistId(values.youtubePlaylistUrl) ||
+      parseYouTubePlaylistId(values.sourceUrl),
+    [values.youtubePlaylistUrl, values.sourceUrl]
+  );
+  const youtubeEmbed = youtubeEmbedUrl(youtubePlaylistId);
+
+  // Auto-fill the source metadata once a valid playlist is detected. The
+  // effect only depends on the id, so an admin can still edit the name,
+  // licence, or description afterwards without the form overwriting them.
+  useEffect(() => {
+    if (!youtubePlaylistId) return;
+    setValue('type', 'course', { shouldDirty: true, shouldValidate: true });
+    if (!parseYouTubePlaylistId(values.youtubePlaylistUrl)) {
+      setValue('youtubePlaylistUrl', youtubePlaylistUrl(youtubePlaylistId), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+    setValue('sourceUrl', youtubePlaylistUrl(youtubePlaylistId), {
+      shouldDirty: true,
+      shouldValidate: true
+    });
+    if (!String(values.sourceName || '').trim()) {
+      setValue('sourceName', t('youtubeCourse.adminSourceName'), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+    if (!String(values.license || '').trim()) {
+      setValue('license', t('youtubeCourse.adminLicense'), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+      setValue('licenseUrl', t('youtubeCourse.adminLicenseUrl'), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [youtubePlaylistId]);
 
   // Warn on a real page unload (reload / tab close). In-app navigation is
   // guarded by the Cancel button's confirm dialog.
@@ -408,6 +454,18 @@ export default function AdminResourceFormPage() {
           <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
           {t('admin.resources.form.unsaved')}
         </p>
+      )}
+
+      {youtubeIntent && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
+          <Youtube className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-300" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">{t('youtubeCourse.adminSectionTitle')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-rose-900/80 dark:text-rose-100/80">
+              {t('youtubeCourse.adminIntent')}
+            </p>
+          </div>
+        </div>
       )}
 
       <form
@@ -814,7 +872,67 @@ export default function AdminResourceFormPage() {
             </div>
           </Section>
 
-          {/* 4 — Thumbnail ------------------------------------------------ */}
+          {/* 4 — YouTube playlist ---------------------------------------- */}
+          <Section
+            id="youtube-course"
+            icon={Youtube}
+            title={t('youtubeCourse.adminSectionTitle')}
+            description={t('youtubeCourse.adminSectionDescription')}
+          >
+            <FormField
+              id="resource-youtube-playlist"
+              label={t('youtubeCourse.playlistUrl')}
+              hint={t('youtubeCourse.playlistUrlHint')}
+              error={errorText('youtubePlaylistUrl')}
+            >
+              <input
+                id="resource-youtube-playlist"
+                type="text"
+                inputMode="url"
+                dir="ltr"
+                className="input"
+                placeholder={t('youtubeCourse.playlistUrlPlaceholder')}
+                aria-invalid={Boolean(errors.youtubePlaylistUrl)}
+                {...register('youtubePlaylistUrl')}
+              />
+            </FormField>
+
+            {youtubePlaylistId ? (
+              <div className="space-y-3">
+                <p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('youtubeCourse.playlistDetected', { id: youtubePlaylistId })}
+                </p>
+                <div className="overflow-hidden rounded-2xl border border-sand-200 bg-black">
+                  <div className="aspect-video w-full">
+                    <iframe
+                      src={youtubeEmbed}
+                      title={t('youtubeCourse.adminPreviewTitle')}
+                      className="h-full w-full"
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] leading-relaxed text-ink-muted">
+                  {t('youtubeCourse.adminPreviewHint')}
+                </p>
+              </div>
+            ) : (
+              <p className="rounded-xl bg-sand-50 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+                {t('youtubeCourse.playlistEmpty')}
+              </p>
+            )}
+
+            <div className="flex items-start gap-2 rounded-xl bg-sand-50 px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+              <p>{t('youtubeCourse.adminAutoFill')}</p>
+            </div>
+          </Section>
+
+          {/* 5 — Thumbnail ------------------------------------------------ */}
           <Section
             icon={ImageIcon}
             title={t('admin.resources.form.thumbnail.title')}
@@ -935,6 +1053,12 @@ export default function AdminResourceFormPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <PreviewTypeChip type={values.type} />
                 <StatusBadge status={values.status} />
+                {youtubePlaylistId && (
+                  <span className="chip bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30">
+                    <Youtube className="h-3 w-3" aria-hidden="true" />
+                    {t('youtubeCourse.adminBadge')}
+                  </span>
+                )}
                 {values.featured && (
                   <span className="chip bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
                     {t('admin.resources.form.preview.featured')}

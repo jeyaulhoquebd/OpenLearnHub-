@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Mail, Scale, ShieldCheck } from 'lucide-react';
+import { OWNER } from '../lib/owner';
 
 export default function LegalLayout({ title, subtitle, children }) {
   const { t } = useTranslation();
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || 'legal@openlearnhub.org';
-  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'hello@openlearnhub.org';
+  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
+  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
 
   const links = [
     { to: '/legal/copyright', label: t('legal.copyrightTitle') },

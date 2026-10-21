@@ -16,13 +16,16 @@ import {
   Languages,
   Layers3,
   Monitor,
+  PlayCircle,
   Share2,
   ShieldCheck,
   Sparkles,
   Tag,
-  UserRound
+  UserRound,
+  Youtube
 } from 'lucide-react';
 import ResourceVisual from '../components/ResourceVisual';
+import CoursePlayer from '../components/CoursePlayer';
 import BookmarkButton from '../components/BookmarkButton';
 import ReportModal from '../components/ReportModal';
 import ResourceCard from '../components/ResourceCard';
@@ -118,17 +121,23 @@ export default function ResourceDetailPage() {
     );
   }
 
-  const actionLabel = {
-    course: t('resource.visitCourse'),
-    book: t('resource.readBook'),
-    software: t('resource.downloadSoftware')
-  }[resource.type];
+  const isYouTubeCourse = resource.type === 'course' && Boolean(resource.youtubePlaylistId);
 
-  const typeNote = {
-    course: t('resource.courseNote'),
-    book: t('resource.bookNote'),
-    software: t('resource.softwareNote')
-  }[resource.type];
+  const actionLabel = isYouTubeCourse
+    ? t('youtubeCourse.startCourse')
+    : {
+        course: t('resource.visitCourse'),
+        book: t('resource.readBook'),
+        software: t('resource.downloadSoftware')
+      }[resource.type];
+
+  const typeNote = isYouTubeCourse
+    ? t('youtubeCourse.playerNote')
+    : {
+        course: t('resource.courseNote'),
+        book: t('resource.bookNote'),
+        software: t('resource.softwareNote')
+      }[resource.type];
 
   async function handleShare() {
     const shareUrl = `${window.location.origin}/resource/${resource.id}`;
@@ -174,6 +183,12 @@ export default function ResourceDetailPage() {
                     {t('common.verified')}
                   </span>
                 )}
+                {isYouTubeCourse && (
+                  <span className="chip bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30">
+                    <Youtube className="h-3 w-3" />
+                    {t('youtubeCourse.adminBadge')}
+                  </span>
+                )}
                 {isPending && (
                   <span className="chip bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">{t('resource.underReview')}</span>
                 )}
@@ -208,15 +223,33 @@ export default function ResourceDetailPage() {
               )}
 
               <div className="mt-7 flex flex-wrap items-center gap-2.5">
-                <a
-                  href={resource.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary btn-lg"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  {actionLabel}
-                </a>
+                {isYouTubeCourse ? (
+                  <Link to={`/course/${resource.id}`} className="btn-primary btn-lg">
+                    <PlayCircle className="h-4 w-4" />
+                    {actionLabel}
+                  </Link>
+                ) : (
+                  <a
+                    href={resource.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary btn-lg"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {actionLabel}
+                  </a>
+                )}
+                {isYouTubeCourse && (
+                  <a
+                    href={resource.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-surface px-4 py-3 text-sm font-semibold text-ink-soft shadow-sm transition hover:border-brand-300 hover:text-brand-800"
+                  >
+                    <Youtube className="h-4 w-4" />
+                    {t('youtubeCourse.watchOnYouTube')}
+                  </a>
+                )}
                 <BookmarkButton resource={resource} labelPosition="full" className="px-4 py-3" />
                 <button
                   type="button"
@@ -251,6 +284,8 @@ export default function ResourceDetailPage() {
       <section className="container-page py-10 sm:py-14">
         <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
           <div className="min-w-0">
+            {isYouTubeCourse && <CoursePlayer resource={resource} className="mb-5" />}
+
             <div className="card p-6 sm:p-8">
               <h2 className="font-display text-2xl font-semibold text-ink">{t('resource.aboutTitle')}</h2>
               <div className="mt-4 space-y-4 text-[15px] leading-7 text-ink-soft">
@@ -403,15 +438,26 @@ export default function ResourceDetailPage() {
                 </div>
               </dl>
 
-              <a
-                href={resource.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary mt-4 w-full justify-center"
-              >
-                {actionLabel}
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
+              {isYouTubeCourse ? (
+                <Link
+                  to={`/course/${resource.id}`}
+                  className="btn-primary mt-4 w-full justify-center"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  {actionLabel}
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <a
+                  href={resource.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary mt-4 w-full justify-center"
+                >
+                  {actionLabel}
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              )}
               <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-muted">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
                 {t('resource.officialSource')}

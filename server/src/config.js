@@ -1,4 +1,13 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Load `server/.env` explicitly instead of relying on the current working
+// directory. This keeps `npm run dev`, `npm start`, `node server/src/index.js`,
+// and the seed/admin scripts consistent. Existing environment variables still
+// win because dotenv does not override them by default.
+const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(serverDir, '.env') });
 
 function parseList(value = '') {
   return value
@@ -40,7 +49,7 @@ export const config = {
   // https://console.groq.com/docs/models for the current list.
   groq: {
     apiKey: process.env.GROQ_API_KEY || '',
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+    model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
     timeoutMs: parseNumber(process.env.GROQ_TIMEOUT_MS, 15000),
     maxOutputTokens: parseNumber(process.env.GROQ_MAX_OUTPUT_TOKENS, 1024),
     roadmapMaxOutputTokens: parseNumber(process.env.GROQ_ROADMAP_MAX_OUTPUT_TOKENS, 2048),

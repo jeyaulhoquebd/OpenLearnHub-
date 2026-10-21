@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { askLearnMate } from '../lib/api';
+import RichText from './RichText';
 
 const SUGGESTIONS = ['assistant.suggestion1', 'assistant.suggestion2', 'assistant.suggestion3'];
 
 export default function ChatPanel({ variant = 'widget', onClose }) {
   const { t, i18n } = useTranslation();
-  const { user, firebaseReady } = useAuth();
+  const { user, firebaseReady, loading } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -35,7 +36,7 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
 
   async function sendMessage(text) {
     const trimmed = text.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sending || loading) return;
     if (!user) return;
 
     const nextMessages = [...messages, { role: 'user', content: trimmed }];
@@ -126,6 +127,12 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
           <p className="text-sm font-semibold text-ink">{t('config.previewTitle')}</p>
           <p className="max-w-xs text-xs leading-relaxed text-ink-muted">{t('auth.configText')}</p>
         </div>
+      ) : loading ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center" role="status" aria-live="polite">
+          <Loader2 className="h-7 w-7 animate-spin text-brand-600" aria-hidden="true" />
+          <p className="text-sm font-semibold text-ink">{t('common.loading')}</p>
+          <p className="max-w-xs text-xs leading-relaxed text-ink-muted">{t('assistant.title')}</p>
+        </div>
       ) : !user ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
@@ -139,7 +146,11 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className={`flex-1 space-y-4 overflow-y-auto bg-sand-50/60 p-4 ${heightClass}`}>
+          <div
+            ref={scrollRef}
+            className={`flex-1 space-y-4 overflow-y-auto bg-sand-50/60 p-4 ${heightClass}`}
+            aria-live="polite"
+          >
             {messages.length === 0 && (
               <div className="rounded-2xl border border-sand-200 bg-surface p-4">
                 <div className="flex items-center gap-2 text-brand-800">
@@ -182,7 +193,11 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
                         : 'border border-sand-200 bg-surface text-ink-soft'
                     }`}
                   >
-                    {message.content}
+                    {message.role === 'assistant' ? (
+                      <RichText text={message.content} />
+                    ) : (
+                      message.content
+                    )}
                   </div>
                   {message.sources?.length > 0 && (
                     <div className="mt-2 space-y-1.5">
