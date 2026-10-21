@@ -87,7 +87,7 @@ The preview server runs at `http://localhost:4173`. In preview mode the AI assis
 | Auth / data | Firebase Web SDK v11 (Auth, Firestore, Storage) |
 | Backend | Node.js 20+, Express 4, firebase-admin, zod, helmet, express-rate-limit |
 | Hosting | Firebase Hosting (frontend); Render / Railway / Cloud Run (API) |
-| AI | Google Gemini via the official `@google/genai` SDK, called server-side only |
+| AI | Groq via the official `groq-sdk` package, called server-side only |
 
 There are **no Cloud Functions**. The API is a normal Express service so it can run on free/cheap containers and be deployed independently.
 
@@ -131,7 +131,7 @@ There are **no Cloud Functions**. The API is a normal Express service so it can 
 - **Node.js 20+** and npm 9+
 - A **Firebase project** (Blaze plan is not required for Hosting/Firestore/Storage at this scale, but check current quotas)
 - **Firebase CLI** for rules and hosting: `npm install -g firebase-tools` (or use `npx firebase-tools`)
-- Optional: a **Google Gemini API key** for LearnMate
+- Optional: a **Groq API key** for LearnMate ([console.groq.com/keys](https://console.groq.com/keys))
 
 ## Quick start
 
@@ -252,21 +252,26 @@ npm run dev
 
 ## LearnMate AI setup
 
-LearnMate uses the Google Gemini API through the official `@google/genai` package, called only from the Express server. Without a key, `/api/ai/chat` and `/api/ai/roadmap` return a clear `503` and the UI explains that the assistant is not configured.
+LearnMate uses **Groq** through the official `groq-sdk` package, called only from the Express server. Without a key, `/api/ai/chat` and `/api/ai/roadmap` return a clear `503` with the message “AI is not configured yet”, and the UI explains that the assistant needs an administrator.
 
-There are **two ways** to provide the key. The stored (admin-panel) key always wins:
+There are **two ways** to provide the key. A key stored from the admin panel always wins over the environment fallback:
 
 1. **Server environment (simplest).** Put the key **only** in `server/.env`:
 
 ```dotenv
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_TIMEOUT_MS=30000
-GEMINI_MAX_OUTPUT_TOKENS=1024
-GEMINI_ROADMAP_MAX_OUTPUT_TOKENS=2048
+GROQ_API_KEY=your-groq-api-key
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_TIMEOUT_MS=15000
+GROQ_MAX_OUTPUT_TOKENS=1024
+GROQ_ROADMAP_MAX_OUTPUT_TOKENS=2048
+AI_DAILY_LIMIT_PER_USER=10
 ```
 
-2. **Admin panel (no redeploy).** Sign in as an admin, open **Admin → AI settings** (`/admin/ai`), paste the key there. The server encrypts it with AES-256-GCM using `SETTINGS_ENCRYPTION_KEY` and stores it in the server-only `settings/ai` document:
+   Groq retires model names over time. Check the current list at
+   [console.groq.com/docs/models](https://console.groq.com/docs/models) before
+   changing `GROQ_MODEL`.
+
+2. **Admin panel (no redeploy).** Sign in as an admin, open **Admin → AI settings** (`/admin/ai-settings`), paste the key there. The server encrypts it with AES-256-GCM using `SETTINGS_ENCRYPTION_KEY` and stores it in the server-only `settings/ai` document:
 
 ```dotenv
 # Generate with: openssl rand -hex 32
@@ -278,13 +283,15 @@ Rotating `SETTINGS_ENCRYPTION_KEY` makes previously stored keys undecryptable �
 How it behaves:
 
 - Requires a valid Firebase ID token (`Authorization: Bearer <token>`). Roadmaps additionally require a **verified email**.
-- Resolution order: Firestore `settings/ai` → `GEMINI_API_KEY`. If neither is set, the API returns `503 llm_unavailable`.
-- Chat is rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour); roadmaps have both an hourly limit (`ROADMAP_RATE_LIMIT_PER_HOUR`, default 10) and a daily quota (`ROADMAP_DAILY_QUOTA`, default 20, counted in `aiUsage/{uid}_{YYYY-MM-DD}`).
-- Retrieves matching resources from the curated library (Firestore) and passes them to the model as grounded context, so the model can only cite resources that actually exist.
+- Resolution order: Firestore `settings/ai` → `GROQ_API_KEY`. If neither is set, the API returns `503 llm_unavailable` with a clear “AI is not configured” message.
+- The admin can switch AI features off entirely; both endpoints then return `503 ai_disabled`.
+- Chat is rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour); roadmaps have both an hourly limit (`ROADMAP_RATE_LIMIT_PER_HOUR`, default 10) and a per-user daily limit from `settings/ai` (`AI_DAILY_LIMIT_PER_USER` is the fallback, default 10), counted in `aiUsage/{uid}_{YYYY-MM-DD}`.
+- Up to **40** matching published resources are retrieved from Firestore and passed to Groq as the only allowed context. The model cannot cite anything outside that list.
 - `POST /api/ai/chat` returns a free-form `reply` plus `sources`.
-- `POST /api/ai/roadmap` returns a validated JSON plan (`title`, `summary`, `steps[]`) whose step ids are mapped back to real resources; unknown ids are discarded.
-- The model is instructed to treat user text as data, not instructions, to resist prompt-injection.
-- The key never reaches the browser; there is no `VITE_GEMINI_*` variable, and `settings/*` is unreadable from clients by rule.
+- `POST /api/ai/roadmap` requests strict JSON (`response_format: json_object`), validates it with zod, drops any unknown resource id, and returns `title`, `summary`, and `steps[{ title, explanation, resourceIds[] }]` plus resolved resource cards. Every step links to real curated resources.
+- Both prompts instruct the model to treat user text as data, not instructions, and to ignore attempts to change the rules or reveal the prompt.
+- Groq calls have a hard 15s timeout. A Groq `429` becomes a friendly response with a `Retry-After` header when the provider supplies one.
+- The key never reaches the browser; there is no `VITE_GROQ_*` variable, and `settings/ai` is unreadable from clients by rule.
 
 ## Environment variables
 
@@ -321,16 +328,16 @@ Leaving the six required Firebase values empty is supported and enables preview 
 | `GOOGLE_APPLICATION_CREDENTIALS` | One auth option | Path to a service-account file (local dev / ADC) |
 | `FIREBASE_STORAGE_BUCKET` | No | Explicit storage bucket |
 | `ADMIN_EMAILS` | Optional | Default target email for `set-admin` when no argument is given |
-| `GEMINI_API_KEY` | For LearnMate | Server-side Gemini key (fallback when none is stored) |
-| `GEMINI_MODEL` | No | Default `gemini-2.5-flash` |
-| `GEMINI_TIMEOUT_MS` | No | Default `30000` |
-| `GEMINI_MAX_OUTPUT_TOKENS` | No | Default `1024` |
-| `GEMINI_ROADMAP_MAX_OUTPUT_TOKENS` | No | Default `2048` |
+| `GROQ_API_KEY` | For LearnMate | Server-side Groq key (fallback when none is stored) |
+| `GROQ_MODEL` | No | Default `llama-3.3-70b-versatile` |
+| `GROQ_TIMEOUT_MS` | No | Default `15000` |
+| `GROQ_MAX_OUTPUT_TOKENS` | No | Default `1024` |
+| `GROQ_ROADMAP_MAX_OUTPUT_TOKENS` | No | Default `2048` |
+| `AI_DAILY_LIMIT_PER_USER` | No | Default daily roadmap limit per user when `settings/ai` has no value (`10`) |
 | `SETTINGS_ENCRYPTION_KEY` | For admin AI settings | AES-256-GCM key (`openssl rand -hex 32`) that encrypts the key stored in `settings/ai` |
 | `REPORT_RATE_LIMIT_PER_HOUR` | No | Default `12` |
 | `AI_RATE_LIMIT_PER_HOUR` | No | Default `25` |
 | `ROADMAP_RATE_LIMIT_PER_HOUR` | No | Default `10` |
-| `ROADMAP_DAILY_QUOTA` | No | Default `20` |
 | `GLOBAL_RATE_LIMIT_PER_15_MIN` | No | Default `400` |
 
 ## Data model and security rules
@@ -380,12 +387,12 @@ it exists. The client also tolerates the older flat shape (`title` as a string,
 `provider`, `url`, `languages`, `status: "pending" | "rejected"`), so existing
 data keeps rendering during the migration.
 
-### `users/{uid}` and `users/{uid}/bookmarks/{resourceId}`
+### `users/{uid}`, `users/{uid}/bookmarks/{resourceId}` and `users/{uid}/roadmaps/{roadmapId}`
 
 - Profiles are readable/writable only by their owner; the profile stores `displayName`, `email`, `photoURL`, `provider`, `preferredLanguage`, and timestamps.
 - Users **cannot** set or change `role` — admin access comes from the `admin` custom claim. The client never writes a role.
 - Owners may delete their own profile (the delete-account flow).
-- Bookmarks are private to the owner.
+- Bookmarks and saved AI roadmaps are private to the owner. Roadmap creation is bounded (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps) and updates are denied.
 
 ### Refined collections
 
@@ -397,8 +404,10 @@ data keeps rendering during the migration.
 | `progress/{userId_resourceId}` | owner | owner (id must be `<uid>_<resourceId>`) |
 | `reviews/{resourceId_userId}` | public (hidden reviews: author/admin only) | verified, signed-in owner (one review per resource); `hidden` is server-only |
 | `reports/{id}` | admins | **Express API only** (Admin SDK) |
-| `roadmaps/{id}` | owner | owner (bounded content, no updates) |
-| `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; daily AI quota) |
+| `roadmaps/{id}` (legacy) | owner | no longer written; new roadmaps use the subcollection below |
+| `users/{uid}/roadmaps/{id}` | owner only | owner only (bounded content, no updates) |
+| `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; per-user daily AI quota) |
+| `aiUsage/{YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; global request/failure counters) |
 | `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
 | `auditLogs/{id}` | **nobody** | **nobody** (Admin SDK only; admin action trail) |
 
@@ -418,13 +427,15 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 
 ```jsonc
 {
-  "provider": "gemini",
-  "model": "gemini-2.5-flash",
+  "provider": "groq",
+  "model": "llama-3.3-70b-versatile",
   "apiKeyCiphertext": "…", // AES-256-GCM, base64
   "apiKeyIv": "…",
   "apiKeyTag": "…",
-  "apiKeyPrefix": "AIza",  // for the masked hint only
+  "apiKeyPrefix": "gsk_",  // for the masked hint only
   "apiKeySuffix": "1234",
+  "enabled": true,
+  "dailyLimitPerUser": 10,
   "updatedAt": "<timestamp>",
   "updatedBy": "<admin uid>"
 }
@@ -438,7 +449,7 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 - Resource update/delete, categories, alternatives: admins only.
 - Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
 - Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`.
-- Roadmaps: owner-only read/delete; create limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps).
+- Roadmaps: `users/{uid}/roadmaps` is owner-only read/delete; create is limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps); updates are denied. The top-level `roadmaps` collection is legacy and no longer written.
 - Reviews: verified email required, one per resource, owner-only edits.
 - `settings/*`: completely denied to clients (the server's Admin SDK writes it).
 - Storage: images under 2 MB for community thumbnails (`thumbnails/{uid}/…`) and images under 1 MB (WebP/JPEG/PNG) for admin resource thumbnails (`thumbnails/admin/{uid}/…`, admin claim only).
@@ -464,8 +475,11 @@ Base URL: `http://localhost:8080` in development.
 | `POST` | `/api/admin/resources/bulk` | Admin claim | Publish/draft/flag/delete up to 100 ids in one batch |
 | `POST` | `/api/admin/resources/test-link` | Admin claim | SSRF-safe link reachability check |
 | `GET` | `/api/admin/settings/ai/status` | Admin claim | Masked AI configuration status (never returns the key) |
-| `POST` | `/api/admin/settings/ai` | Admin claim | Store/clear the encrypted Gemini key + model |
-| `POST` | `/api/admin/settings/ai/test` | Admin claim | Verify a candidate or active key with a minimal Gemini call |
+| `POST` | `/api/admin/settings/ai` | Admin claim | Save the encrypted Groq key, model, feature switch and daily limit |
+| `POST` | `/api/admin/settings/ai/test` | Admin claim | Verify a candidate or active Groq key with a minimal call |
+| `GET` | `/api/admin/settings/ai/models` | Admin claim | List models available to the configured Groq key |
+| `GET` | `/api/admin/settings/ai/usage` | Admin claim | Today/7-day AI request and failure counters |
+| `DELETE` | `/api/admin/settings/ai/key` | Admin claim | Remove the stored key (falls back to `GROQ_API_KEY`) |
 | `GET` | `/api/admin/categories` | Admin claim | Categories with resource counts and order |
 | `POST` | `/api/admin/categories` | Admin claim | Create a category (unique slug, icon whitelist, audited) |
 | `PUT` | `/api/admin/categories/:id` | Admin claim | Update a category; renaming the English name moves its resources |
@@ -552,8 +566,8 @@ Response (step `resources` always come from the curated library):
     {
       "order": 1,
       "title": "Learn HTML & CSS",
-      "description": "…",
-      "estimatedWeeks": 3,
+      "explanation": "…",
+      "resourceIds": ["freecodecamp-web"],
       "resources": [{ "id": "freecodecamp-web", "title": "…", "url": "https://…", "type": "course" }]
     }
   ],
@@ -563,9 +577,9 @@ Response (step `resources` always come from the curated library):
 
 ### Admin AI settings
 
-`GET /api/admin/settings/ai/status` returns `{ configured, source, model, hasStoredKey, keyHint, encryptionAvailable, updatedAt, updatedBy }` — the API key itself is never returned. `POST /api/admin/settings/ai` accepts `{ apiKey, model }`; an empty `apiKey` clears the stored key. `POST /api/admin/settings/ai/test` accepts the same fields and verifies the key (falling back to the active key when `apiKey` is empty).
+`GET /api/admin/settings/ai/status` returns `{ hasKey, source: "admin" | "env" | "none", maskedKey, model, enabled, dailyLimitPerUser, updatedAt }` — the API key itself is never returned. `POST /api/admin/settings/ai` accepts `{ apiKey?, model?, enabled?, dailyLimitPerUser? }`; a blank `apiKey` keeps the stored key, and `DELETE /api/admin/settings/ai/key` removes it. `POST /api/admin/settings/ai/test` verifies a candidate or the active key. `GET /api/admin/settings/ai/models` lists the models available to the configured key, and `GET /api/admin/settings/ai/usage` returns the today/7-day counters for the admin usage card.
 
-Saved roadmaps are written by the **client** to the `roadmaps` collection (owner-only rules), not through the API.
+Saved roadmaps are written by the **client** to `users/{uid}/roadmaps` (owner-only rules), not through the API. The public AI Assistant page (`/assistant`) builds a roadmap and offers **Save roadmap**, which writes to that subcollection.
 
 Errors use a consistent shape: `{ "error": { "code": "…", "message": "…" } }`.
 
@@ -656,9 +670,9 @@ Admin access comes **only** from the `admin: true` custom claim (set with `scrip
 | `/admin/reviews` | Moderation: search + rating filters, hide/show/delete (single and bulk), detail modal, automatic rating recalculation |
 | `/admin/reports` | Reports queue: board/table views, illegal-first priority, reason/status/search filters, detail drawer with admin note, status changes and one-click unpublish |
 | `/admin/link-checker` | Maintenance: full or selected background link checks, live progress, result filters/sort, per-row re-check and bulk flagging of broken links |
-| `/admin/import-export` | Maintenance tool (next step) |
-| `/admin/ai` | AI Settings — store the encrypted Gemini key (working today) |
-| `/admin/settings`, `/admin/audit-log` | Site settings and the read-only action trail |
+| `/admin/import-export` | Server-generated JSON/CSV exports, drag-and-drop import with per-row validation preview, skip/update duplicate handling, 400-row batches, draft defaults, error report and trilingual templates |
+| `/admin/ai-settings` | AI Settings — encrypted Groq key, model dropdown, test/remove, feature switch, daily limit and usage counters |
+| `/admin/site-settings`, `/admin/audit-log` | Site settings and the read-only action trail |
 
 - **Guard:** `components/admin/AdminRoute.jsx` waits for auth, re-checks the current ID token, and redirects non-admins home with a translated "Access denied" toast. The public navbar shows a small **Admin** link to admins only.
 - **Shell:** `components/admin/AdminLayout.jsx` renders a collapsible sidebar (state kept in `localStorage`), a mobile drawer, breadcrumbs, theme and language switches, a report counter, and the account menu. Every admin screen is `React.lazy`-loaded.

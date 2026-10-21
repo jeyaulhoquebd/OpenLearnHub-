@@ -11,6 +11,7 @@ import {
   Loader2,
   MessageSquare,
   Plus,
+  Route,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -29,8 +30,10 @@ import { useToast } from '../context/ToastContext';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { useResources } from '../hooks/useResources';
 import {
+  deleteRoadmap,
   fetchBookmarks,
   fetchProgress,
+  fetchRoadmaps,
   fetchUserReviews,
   fetchUserSubmissions
 } from '../lib/data';
@@ -60,6 +63,7 @@ export default function DashboardPage() {
   const [submissions, setSubmissions] = useState([]);
   const [progress, setProgress] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [roadmaps, setRoadmaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   usePageMeta(t('dashboard.title', { name: profile?.displayName || user?.displayName || '' }));
@@ -87,14 +91,16 @@ export default function DashboardPage() {
       fetchBookmarks(user.uid),
       fetchUserSubmissions(user.uid),
       fetchProgress(user.uid),
-      fetchUserReviews(user.uid)
+      fetchUserReviews(user.uid),
+      fetchRoadmaps(user.uid)
     ])
-      .then(([saved, submitted, tracked, mine]) => {
+      .then(([saved, submitted, tracked, mine, plans]) => {
         if (!active) return;
         setBookmarks(saved);
         setSubmissions(submitted);
         setProgress(tracked);
         setReviews(mine);
+        setRoadmaps(plans);
       })
       .catch((error) => {
         console.warn('[dashboard]', error);
@@ -103,6 +109,7 @@ export default function DashboardPage() {
           setSubmissions([]);
           setProgress([]);
           setReviews([]);
+          setRoadmaps([]);
         }
       })
       .finally(() => {
@@ -148,6 +155,18 @@ export default function DashboardPage() {
       await updatePreferredLanguage(event.target.value);
     } catch {
       push(t('auth.genericError'), { type: 'error' });
+    }
+  }
+
+  async function handleDeleteRoadmap(roadmapId) {
+    if (!user || !window.confirm(t('dashboard.deleteRoadmapConfirm'))) return;
+    try {
+      await deleteRoadmap(user.uid, roadmapId);
+      setRoadmaps((items) => items.filter((item) => item.id !== roadmapId));
+      push(t('dashboard.roadmapDeleted'));
+    } catch (error) {
+      console.warn('[dashboard] roadmap delete failed:', error);
+      push(t('roadmap.saveError'), { type: 'error' });
     }
   }
 
@@ -216,6 +235,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-sand-200 pb-1">
           {[
             { key: 'saved', label: t('dashboard.saved'), count: bookmarks.length },
+            { key: 'roadmaps', label: t('dashboard.roadmaps'), count: roadmaps.length },
             { key: 'progress', label: t('dashboard.inProgress'), count: progressItems.length },
             { key: 'reviews', label: t('dashboard.reviews'), count: reviews.length },
             { key: 'submissions', label: t('dashboard.submissions'), count: submissions.length },
@@ -256,6 +276,113 @@ export default function DashboardPage() {
                 action={
                   <Link to="/explore" className="btn-primary">
                     {t('dashboard.browse')}
+                  </Link>
+                }
+              />
+            )
+          )}
+
+          {activeTab === 'roadmaps' && (
+            loading ? (
+              <div className="space-y-3">
+                {[0, 1].map((item) => (
+                  <div key={item} className="skeleton h-32 w-full" />
+                ))}
+              </div>
+            ) : roadmaps.length ? (
+              <div className="space-y-4">
+                {roadmaps.map((plan) => (
+                  <article key={plan.id} className="card p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="chip bg-brand-50 text-brand-800 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/30">
+                            <Route className="h-3 w-3" aria-hidden="true" />
+                            {t('dashboard.roadmap')}
+                          </span>
+                          <span className="text-[11px] text-ink-muted">
+                            {formatDate(plan.createdAt, i18n.language)}
+                          </span>
+                        </div>
+                        <h2 className="mt-2 font-display text-xl font-semibold text-ink">
+                          {plan.title || plan.goal}
+                        </h2>
+                        {plan.summary && (
+                          <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+                            {plan.summary}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRoadmap(plan.id)}
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink-muted transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                        aria-label={t('dashboard.deleteRoadmap')}
+                        title={t('dashboard.deleteRoadmap')}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                      {t('dashboard.roadmapSteps', { n: plan.steps?.length || 0 })}
+                    </p>
+
+                    <ol className="mt-3 space-y-2.5">
+                      {(plan.steps || []).map((step, index) => {
+                        const resources =
+                          step.resources?.length > 0
+                            ? step.resources
+                            : [];
+                        return (
+                          <li
+                            key={`${plan.id}-${step.order || index}`}
+                            className="rounded-xl border border-sand-200 bg-sand-50/50 p-3 dark:border-white/10 dark:bg-white/5"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy-800 text-[11px] font-bold text-white">
+                                {step.order || index + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-ink">{step.title}</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
+                                  {step.explanation || step.description}
+                                </p>
+                                {resources.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {resources.slice(0, 4).map((resource) => (
+                                      <a
+                                        key={resource.id}
+                                        href={resource.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex max-w-full items-center gap-1 rounded-lg border border-sand-200 bg-surface px-2 py-1 text-[11px] font-semibold text-brand-800 transition hover:border-brand-300 dark:border-white/10 dark:text-brand-200"
+                                      >
+                                        <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span className="truncate">
+                                          {localized(resource.title, i18n.language)}
+                                        </span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Route}
+                title={t('dashboard.emptyRoadmapsTitle')}
+                text={t('dashboard.emptyRoadmapsText')}
+                action={
+                  <Link to="/assistant" className="btn-primary">
+                    {t('dashboard.buildRoadmap')}
                   </Link>
                 }
               />

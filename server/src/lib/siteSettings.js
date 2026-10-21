@@ -1,4 +1,3 @@
-import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { getDb } from '../firebase.js';
 import { sanitizeText } from './validation.js';
@@ -135,15 +134,11 @@ function cleanMap(value, max) {
   return output;
 }
 
-function toIso(value) {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
-  if (typeof value.toDate === 'function') return value.toDate().toISOString();
-  if (typeof value.seconds === 'number') return new Date(value.seconds * 1000).toISOString();
-  return null;
-}
-
-/** Merges a stored document over the defaults, filling missing translations. */
+/**
+ * Merges a stored document over the defaults, filling missing translations.
+ * Only public fields are returned: this document is readable by every visitor,
+ * and the editing administrator is recorded in the server-only audit log.
+ */
 export function normalizeSiteSettings(raw = {}) {
   const defaults = DEFAULT_SITE_SETTINGS;
   const social = raw.socialLinks && typeof raw.socialLinks === 'object' ? raw.socialLinks : {};
@@ -169,9 +164,7 @@ export function normalizeSiteSettings(raw = {}) {
       type: ANNOUNCEMENT_TYPES.includes(announcement.type) ? announcement.type : 'info',
       text: { ...defaults.announcement.text, ...cleanMap(text, 300) }
     },
-    maintenanceMode: raw.maintenanceMode === true,
-    updatedAt: toIso(raw.updatedAt),
-    updatedBy: raw.updatedBy || null
+    maintenanceMode: raw.maintenanceMode === true
   };
 }
 
@@ -219,7 +212,7 @@ function cleanPayload(input) {
 }
 
 /** Saves the public site settings and returns the normalized document. */
-export async function saveSiteSettings(input, { updatedBy = null } = {}) {
+export async function saveSiteSettings(input) {
   const db = getDb();
   if (!db) {
     const error = new Error('Site settings storage is unavailable.');
@@ -230,14 +223,9 @@ export async function saveSiteSettings(input, { updatedBy = null } = {}) {
   const payload = cleanPayload(input);
   const ref = db.collection('settings').doc(DOC_ID);
 
-  await ref.set(
-    {
-      ...payload,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: updatedBy || null
-    },
-    { merge: true }
-  );
+  // Replace the whole public document so stale metadata (for example an old
+  // `updatedBy` field) cannot linger from an earlier schema.
+  await ref.set(payload);
 
   cache = { value: null, fetchedAt: 0 };
   return getSiteSettings({ force: true });

@@ -18,12 +18,22 @@ function ScrollToTop() {
   return null;
 }
 
+// Sign-in stays reachable during maintenance, otherwise the maintenance page's
+// "Administrator sign in" link would be swallowed by the maintenance gate.
+const MAINTENANCE_EXEMPT_PATHS = new Set(['/login', '/forgot-password']);
+
 export default function Layout() {
+  const { pathname } = useLocation();
   const { settings } = useSiteSettings();
   const { isAdmin, loading: authLoading } = useAuth();
 
   // Keep the site reachable for administrators while the public is paused.
-  if (settings.maintenanceMode && !authLoading && !isAdmin) {
+  if (
+    settings.maintenanceMode &&
+    !authLoading &&
+    !isAdmin &&
+    !MAINTENANCE_EXEMPT_PATHS.has(pathname)
+  ) {
     return <MaintenancePage />;
   }
 

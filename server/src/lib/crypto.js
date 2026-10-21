@@ -1,6 +1,6 @@
 /**
  * Symmetric encryption for secrets stored in Firestore (currently the
- * admin-managed Gemini API key in `settings/ai`).
+ * admin-managed Groq API key in `settings/ai`).
  *
  * AES-256-GCM is used so the ciphertext is authenticated: if the stored value
  * is tampered with, decryption fails loudly instead of returning garbage.
@@ -92,7 +92,7 @@ export function decryptSecret({ ciphertext, iv, tag }) {
 }
 
 /**
- * Builds a display-only hint such as `AIza••••••••1234`. The full key is never
+ * Builds a display-only hint such as `gsk_••••••••1234`. The full key is never
  * returned to the browser.
  */
 export function maskSecret(value) {

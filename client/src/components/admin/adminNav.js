@@ -46,8 +46,8 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { to: '/admin/link-checker', key: 'linkChecker', icon: Link2 },
       { to: '/admin/import-export', key: 'importExport', icon: Upload },
-      { to: '/admin/ai', key: 'aiSettings', icon: Sparkles },
-      { to: '/admin/settings', key: 'siteSettings', icon: Settings },
+      { to: '/admin/ai-settings', key: 'aiSettings', icon: Sparkles },
+      { to: '/admin/site-settings', key: 'siteSettings', icon: Settings },
       { to: '/admin/audit-log', key: 'auditLog', icon: ScrollText }
     ]
   }

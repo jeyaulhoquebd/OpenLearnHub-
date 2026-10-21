@@ -388,30 +388,43 @@ export function summarizeReviews(reviews = []) {
 }
 
 // ---------------------------------------------------------------------------
-// Saved AI roadmaps (top-level collection, owner-scoped)
+// Saved AI roadmaps (`users/{uid}/roadmaps`, owner-scoped)
 // ---------------------------------------------------------------------------
 
-/** Trims a roadmap step to the plain shape Firestore accepts (no undefined). */
-function toStoredRoadmapStep(step = {}) {
+function toStoredRoadmapResource(resource = {}) {
   return {
-    order: Number(step.order) || 0,
+    id: String(resource.id || '').slice(0, 160),
+    title: String(resource.title || '').slice(0, 200),
+    url: String(resource.url || '').slice(0, 600),
+    type: String(resource.type || '').slice(0, 20),
+    sourceName: String(resource.sourceName || '').slice(0, 160),
+    level: String(resource.level || '').slice(0, 40),
+    category: String(resource.category || '').slice(0, 80)
+  };
+}
+
+/** Trims a roadmap step to the plain shape Firestore accepts (no undefined). */
+function toStoredRoadmapStep(step = {}, index = 0) {
+  const resources = Array.isArray(step.resources)
+    ? step.resources.filter((resource) => resource?.id).map(toStoredRoadmapResource)
+    : [];
+  const ids = Array.isArray(step.resourceIds) && step.resourceIds.length
+    ? step.resourceIds
+    : resources.map((resource) => resource.id);
+
+  return {
+    order: Number(step.order) || index + 1,
     title: String(step.title || '').slice(0, 200),
-    description: String(step.description || '').slice(0, 1500),
-    estimatedWeeks:
-      Number.isFinite(Number(step.estimatedWeeks)) && Number(step.estimatedWeeks) >= 0
-        ? Math.round(Number(step.estimatedWeeks))
-        : null,
-    resourceIds: (step.resources || [])
-      .map((resource) => resource?.id)
-      .filter(Boolean)
-      .slice(0, 6)
+    explanation: String(step.explanation || step.description || '').slice(0, 1500),
+    resourceIds: [...new Set(ids.map((id) => String(id).slice(0, 160)))].slice(0, 6),
+    resources: resources.slice(0, 6)
   };
 }
 
 export async function saveRoadmap(uid, roadmap) {
   if (!db || !uid) throw new Error('Sign in to save a roadmap.');
   const steps = Array.isArray(roadmap?.steps) ? roadmap.steps.slice(0, 20) : [];
-  const ref = await addDoc(collection(db, 'roadmaps'), {
+  const ref = await addDoc(collection(db, 'users', uid, 'roadmaps'), {
     userId: uid,
     goal: String(roadmap?.goal || '').slice(0, 300),
     level: String(roadmap?.level || 'beginner').slice(0, 20),
@@ -419,10 +432,17 @@ export async function saveRoadmap(uid, roadmap) {
     title: String(roadmap?.title || '').slice(0, 200),
     summary: String(roadmap?.summary || '').slice(0, 1200),
     steps: steps.map(toStoredRoadmapStep),
-    resourceIds: steps
-      .flatMap((step) => (step.resources || []).map((resource) => resource?.id))
-      .filter(Boolean)
-      .slice(0, 60),
+    resourceIds: [
+      ...new Set(
+        steps
+          .flatMap((step) => [
+            ...(Array.isArray(step.resourceIds) ? step.resourceIds : []),
+            ...(step.resources || []).map((resource) => resource?.id)
+          ])
+          .filter(Boolean)
+          .map((id) => String(id))
+      )
+    ].slice(0, 60),
     createdAt: serverTimestamp()
   });
   return ref.id;
@@ -430,7 +450,7 @@ export async function saveRoadmap(uid, roadmap) {
 
 export async function fetchRoadmaps(uid) {
   if (!db || !uid) return [];
-  const snap = await getDocs(query(collection(db, 'roadmaps'), where('userId', '==', uid)));
+  const snap = await getDocs(collection(db, 'users', uid, 'roadmaps'));
   return snap.docs
     .map((entry) => ({
       ...entry.data(),
@@ -440,9 +460,9 @@ export async function fetchRoadmaps(uid) {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
-export async function deleteRoadmap(roadmapId) {
-  if (!db || !roadmapId) throw new Error('Sign in to manage roadmaps.');
-  await deleteDoc(doc(db, 'roadmaps', roadmapId));
+export async function deleteRoadmap(uid, roadmapId) {
+  if (!db || !uid || !roadmapId) throw new Error('Sign in to manage roadmaps.');
+  await deleteDoc(doc(db, 'users', uid, 'roadmaps', roadmapId));
 }
 
 // ---------------------------------------------------------------------------

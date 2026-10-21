@@ -38,6 +38,7 @@ app.use(
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Retry-After', 'Content-Disposition'],
     maxAge: 86400
   })
 );
@@ -82,7 +83,12 @@ app.get('/', (req, res) => {
       '/api/admin/import',
       '/api/admin/import-export/export/resources',
       '/api/admin/audit-logs',
+      '/api/admin/settings/ai',
       '/api/admin/settings/ai/status',
+      '/api/admin/settings/ai/test',
+      '/api/admin/settings/ai/models',
+      '/api/admin/settings/ai/usage',
+      '/api/admin/settings/ai/key',
       '/api/admin/settings/site'
     ]
   });
@@ -101,7 +107,9 @@ const server = app.listen(config.port, () => {
   console.log(
     `[server] OpenLearn Hub API listening on port ${config.port} (${config.nodeEnv}) · Firebase Admin: ${
       isFirebaseReady() ? 'ready' : 'not configured'
-    } · LearnMate: ${config.gemini.apiKey ? 'configured' : 'not configured'}`
+    } · LearnMate (Groq): ${
+      config.groq.apiKey ? 'configured via GROQ_API_KEY' : 'configure in Admin → AI Settings'
+    }`
   );
 });
 

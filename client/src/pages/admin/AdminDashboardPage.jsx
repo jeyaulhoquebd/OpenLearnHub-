@@ -269,7 +269,7 @@ export default function AdminDashboardPage() {
         description={t('admin.dashboard.subtitle')}
         actions={
           <>
-            <Link to="/admin/ai" className="btn-secondary btn-sm">
+            <Link to="/admin/ai-settings" className="btn-secondary btn-sm">
               <Sparkles className="h-4 w-4" aria-hidden="true" />
               {t('adminAi.title')}
             </Link>

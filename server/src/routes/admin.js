@@ -5,10 +5,11 @@ import { apiError } from '../lib/http.js';
 import { sanitizeText } from '../lib/validation.js';
 import { writeAuditLogForRequest } from '../lib/audit.js';
 import { getFirebaseAuth } from '../firebase.js';
-import { getAiSettingsStatus, saveAiSettings, resolveAiConfig } from '../lib/settings.js';
+import { getAiSettingsStatus, saveAiSettings, deleteStoredAiKey, resolveAiConfig } from '../lib/settings.js';
+import { getAiUsageStats } from '../lib/quota.js';
 import { getSiteSettings, saveSiteSettings, siteSettingsSchema } from '../lib/siteSettings.js';
 import { getAdminStats } from '../lib/stats.js';
-import { testGeminiKey } from '../lib/ai.js';
+import { listGroqModels, testGroqKey } from '../lib/ai.js';
 import { adminResourcesRouter } from './adminResources.js';
 import { adminCategoriesRouter } from './adminCategories.js';
 import { adminAlternativesRouter } from './adminAlternatives.js';
@@ -21,20 +22,21 @@ import { adminImportRouter } from './adminImport.js';
 import { adminAuditLogsRouter } from './adminAuditLogs.js';
 
 const aiSettingsSchema = z.object({
-  // Empty string clears the stored key and falls back to the env key.
+  // Empty string means "leave the stored key unchanged". Use DELETE to remove.
   apiKey: z.string().trim().max(300).optional().default(''),
   model: z
     .string()
     .trim()
-    .max(80)
+    .max(120)
     .optional()
-    .default('')
-    .transform((value) => sanitizeText(value, { max: 80 }))
+    .transform((value) => (value ? sanitizeText(value, { max: 120 }) : '')),
+  enabled: z.boolean().optional(),
+  dailyLimitPerUser: z.coerce.number().int().min(1).max(200).optional()
 });
 
 const testSchema = z.object({
   apiKey: z.string().trim().max(300).optional().default(''),
-  model: z.string().trim().max(80).optional().default('')
+  model: z.string().trim().max(120).optional().default('')
 });
 
 export const adminRouter = Router();
@@ -133,7 +135,7 @@ adminRouter.post('/settings/site', async (req, res, next) => {
 
     let settings;
     try {
-      settings = await saveSiteSettings(parsed.data, { updatedBy: req.user.uid });
+      settings = await saveSiteSettings(parsed.data);
     } catch (error) {
       if (error.code === 'database_unavailable') {
         return apiError(res, 503, 'database_unavailable', 'Settings storage is unavailable right now.');
@@ -199,33 +201,55 @@ adminRouter.get('/settings/ai/status', async (req, res, next) => {
 
 /**
  * POST /api/admin/settings/ai
- * Stores (or clears) the Gemini API key and model. The key is encrypted with
- * AES-256-GCM before it reaches Firestore.
+ * Stores the encrypted Groq API key and model/preferences. Omitted fields are
+ * left unchanged; use DELETE /settings/ai/key to remove a stored key.
  */
 adminRouter.post('/settings/ai', async (req, res, next) => {
   try {
     const parsed = aiSettingsSchema.safeParse(req.body || {});
     if (!parsed.success) {
-      return apiError(res, 400, 'invalid_settings', 'Those AI settings are not valid.', parsed.error.flatten());
+      return apiError(
+        res,
+        400,
+        'invalid_settings',
+        'Those AI settings are not valid.',
+        parsed.error.flatten()
+      );
     }
 
-    const { apiKey, model } = parsed.data;
+    const body = req.body || {};
+    const { apiKey, enabled, dailyLimitPerUser } = parsed.data;
+    const model = parsed.data.model;
 
-    // Gemini keys are long; a short non-empty value is almost certainly a typo.
-    if (apiKey && apiKey.length < 20) {
-      return apiError(res, 400, 'invalid_key', 'That does not look like a valid Gemini API key.');
+    if (apiKey && (!apiKey.startsWith('gsk_') || apiKey.length < 20)) {
+      return apiError(
+        res,
+        400,
+        'invalid_key',
+        'That does not look like a Groq API key. Groq keys start with "gsk_".'
+      );
+    }
+
+    const payload = { apiKey, updatedBy: req.user.uid };
+    if (body.model !== undefined) payload.model = model;
+    if (body.enabled !== undefined) payload.enabled = enabled;
+    if (body.dailyLimitPerUser !== undefined) {
+      payload.dailyLimitPerUser = dailyLimitPerUser;
     }
 
     let status;
     try {
-      status = await saveAiSettings({ apiKey, model, updatedBy: req.user.uid });
+      status = await saveAiSettings(payload);
     } catch (error) {
+      if (error.code === 'invalid_key') {
+        return apiError(res, 400, 'invalid_key', error.message);
+      }
       if (error.code === 'encryption_unavailable') {
         return apiError(
           res,
           503,
           'encryption_unavailable',
-          'The server is missing SETTINGS_ENCRYPTION_KEY, so a new key cannot be stored securely. Use GEMINI_API_KEY instead.'
+          'The server is missing SETTINGS_ENCRYPTION_KEY, so a new key cannot be stored securely. Use GROQ_API_KEY instead.'
         );
       }
       if (error.code === 'database_unavailable') {
@@ -241,13 +265,54 @@ adminRouter.post('/settings/ai', async (req, res, next) => {
       targetId: 'ai',
       details: {
         keyChanged: Boolean(apiKey),
-        keyCleared: !apiKey,
-        model: model || null,
-        source: status?.source || null
+        model: status.model,
+        enabled: status.enabled,
+        dailyLimitPerUser: status.dailyLimitPerUser,
+        source: status.source
       }
     });
 
     return res.json({ ok: true, status });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * GET /api/admin/settings/ai/models
+ * Lists the models available to the configured Groq key so the admin can pick
+ * one from a dropdown. The key is only used server-side.
+ */
+adminRouter.get('/settings/ai/models', async (req, res, next) => {
+  try {
+    const resolved = await resolveAiConfig({ force: true });
+    if (!resolved.apiKey) {
+      return apiError(
+        res,
+        400,
+        'llm_unavailable',
+        'AI is not configured yet. Add a Groq API key first, then load the model list.'
+      );
+    }
+
+    let models;
+    try {
+      models = await listGroqModels({ apiKey: resolved.apiKey });
+    } catch (error) {
+      setRetryAfter(res, error);
+      if (error.code === 'llm_unauthorized') {
+        return apiError(res, 400, 'llm_unauthorized', 'Groq rejected the configured API key.');
+      }
+      if (error.code === 'llm_rate_limited') {
+        return apiError(res, 429, 'llm_rate_limited', 'Groq is rate-limiting this key. Try again shortly.');
+      }
+      if (error.code === 'llm_timeout') {
+        return apiError(res, 504, 'llm_timeout', 'Groq did not respond in time. Please try again.');
+      }
+      return apiError(res, 502, 'llm_error', 'The model list could not be loaded from Groq.');
+    }
+
+    return res.json({ models, selected: resolved.model });
   } catch (error) {
     return next(error);
   }
@@ -268,6 +333,15 @@ adminRouter.post('/settings/ai/test', async (req, res, next) => {
     const candidateKey = parsed.data.apiKey.trim();
     const candidateModel = parsed.data.model.trim();
 
+    if (candidateKey && (!candidateKey.startsWith('gsk_') || candidateKey.length < 20)) {
+      return apiError(
+        res,
+        400,
+        'invalid_key',
+        'That does not look like a Groq API key. Groq keys start with "gsk_".'
+      );
+    }
+
     let apiKey = candidateKey;
     let model = candidateModel;
 
@@ -282,22 +356,26 @@ adminRouter.post('/settings/ai/test', async (req, res, next) => {
         res,
         400,
         'llm_unavailable',
-        'There is no API key to test yet. Add a Gemini API key first.'
+        'AI is not configured yet. Add a Groq API key first.'
       );
     }
 
     let result;
     try {
-      result = await testGeminiKey({ apiKey, model });
+      result = await testGroqKey({ apiKey, model });
     } catch (error) {
+      setRetryAfter(res, error);
       if (error.code === 'llm_timeout') {
-        return apiError(res, 504, 'llm_timeout', 'The provider did not respond in time. Check your connection and the key.');
+        return apiError(res, 504, 'llm_timeout', 'Groq did not respond in time. Check your connection and the key.');
       }
       if (error.code === 'llm_unauthorized') {
-        return apiError(res, 400, 'llm_unauthorized', 'That API key was rejected by Gemini. Please check it and try again.');
+        return apiError(res, 400, 'llm_unauthorized', 'Groq rejected that API key. Please check it and try again.');
       }
       if (error.code === 'llm_rate_limited') {
-        return apiError(res, 429, 'llm_rate_limited', 'Gemini is rate-limiting this key right now. Try again shortly.');
+        return apiError(res, 429, 'llm_rate_limited', 'Groq is rate-limiting this key right now. Try again shortly.');
+      }
+      if (error.code === 'llm_bad_request') {
+        return apiError(res, 400, 'llm_bad_request', 'That model is not available for this key. Pick another model.');
       }
       return apiError(res, 502, 'llm_error', 'The key could not be verified right now. Please try again.');
     }
@@ -307,3 +385,56 @@ adminRouter.post('/settings/ai/test', async (req, res, next) => {
     return next(error);
   }
 });
+
+/**
+ * DELETE /api/admin/settings/ai/key
+ * Removes the encrypted key from settings/ai. If GROQ_API_KEY is set in the
+ * environment it becomes the active key again.
+ */
+adminRouter.delete('/settings/ai/key', async (req, res, next) => {
+  try {
+    let status;
+    try {
+      status = await deleteStoredAiKey({ updatedBy: req.user.uid });
+    } catch (error) {
+      if (error.code === 'database_unavailable') {
+        return apiError(res, 503, 'database_unavailable', 'Settings storage is unavailable right now.');
+      }
+      throw error;
+    }
+
+    await writeAuditLogForRequest(req, {
+      action: 'settings.ai.delete_key',
+      targetType: 'settings',
+      targetId: 'ai',
+      details: { source: status.source }
+    });
+
+    return res.json({ ok: true, status });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * GET /api/admin/settings/ai/usage
+ * Simple request/failure counters for today and the last seven days.
+ */
+adminRouter.get('/settings/ai/usage', async (req, res, next) => {
+  try {
+    const [usage, status] = await Promise.all([
+      getAiUsageStats(),
+      getAiSettingsStatus()
+    ]);
+    return res.json({ usage, dailyLimitPerUser: status.dailyLimitPerUser });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Sets a Retry-After header when Groq told us how long to wait. */
+function setRetryAfter(res, error) {
+  if (Number.isFinite(error?.retryAfter) && error.retryAfter > 0) {
+    res.set('Retry-After', String(error.retryAfter));
+  }
+}

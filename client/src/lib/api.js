@@ -2,11 +2,13 @@ const rawApiUrl = import.meta.env.VITE_API_URL || '';
 export const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
 export class ApiError extends Error {
-  constructor(message, status = 0, code = 'api_error') {
+  constructor(message, status = 0, code = 'api_error', extras = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = extras.details;
+    this.retryAfter = extras.retryAfter;
   }
 }
 
@@ -21,7 +23,10 @@ async function apiRequest(path, { method = 'GET', body, token, signal } = {}) {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-      signal
+      signal,
+      // Admin status, model lists and usage counters must never be served from
+      // the browser's HTTP cache.
+      cache: 'no-store'
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error;
@@ -40,10 +45,15 @@ async function apiRequest(path, { method = 'GET', body, token, signal } = {}) {
   }
 
   if (!response.ok) {
+    const retryAfter = Number(response.headers.get('retry-after'));
     throw new ApiError(
       payload?.error?.message || payload?.message || 'Something went wrong. Please try again.',
       response.status,
-      payload?.error?.code || 'request_failed'
+      payload?.error?.code || 'request_failed',
+      {
+        details: payload?.error?.details,
+        retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined
+      }
     );
   }
 
@@ -76,10 +86,10 @@ export function getAiSettingsStatus(token) {
   return apiRequest('/api/admin/settings/ai/status', { token });
 }
 
-export function saveAiSettings({ apiKey, model }, token) {
+export function saveAiSettings({ apiKey, model, enabled, dailyLimitPerUser }, token) {
   return apiRequest('/api/admin/settings/ai', {
     method: 'POST',
-    body: { apiKey, model },
+    body: { apiKey, model, enabled, dailyLimitPerUser },
     token
   });
 }
@@ -90,6 +100,18 @@ export function testAiKey({ apiKey, model }, token) {
     body: { apiKey, model },
     token
   });
+}
+
+export function getAiModels(token, { signal } = {}) {
+  return apiRequest('/api/admin/settings/ai/models', { token, signal });
+}
+
+export function deleteAiKey(token) {
+  return apiRequest('/api/admin/settings/ai/key', { method: 'DELETE', token });
+}
+
+export function getAiUsage(token, { signal } = {}) {
+  return apiRequest('/api/admin/settings/ai/usage', { token, signal });
 }
 
 export function getApiHealth() {

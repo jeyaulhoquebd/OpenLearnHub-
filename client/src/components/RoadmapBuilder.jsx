@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   BookmarkPlus,
-  CalendarClock,
   ExternalLink,
+  GraduationCap,
+  Library,
   Loader2,
   LogIn,
   MailCheck,
@@ -117,7 +118,7 @@ export default function RoadmapBuilder() {
     if (!window.confirm(t('roadmap.confirmDelete'))) return;
     setBusyId(roadmapId);
     try {
-      await deleteRoadmap(roadmapId);
+      await deleteRoadmap(user.uid, roadmapId);
       setSavedRoadmaps((items) => items.filter((item) => item.id !== roadmapId));
       push(t('roadmap.deletedToast'));
     } catch (deleteError) {
@@ -238,10 +239,32 @@ export default function RoadmapBuilder() {
         </form>
 
         {generating && (
-          <div className="space-y-3" aria-hidden="true">
-            <div className="skeleton h-6 w-2/3" />
-            <div className="skeleton h-24 w-full" />
-            <div className="skeleton h-24 w-full" />
+          <div
+            className="rounded-2xl border border-brand-200 bg-surface p-5"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-3">
+              <span className="relative grid h-10 w-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                <span className="absolute inset-0 animate-ping rounded-full bg-brand-200/60" />
+                <Loader2 className="relative h-5 w-5 animate-spin" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-ink">{t('roadmap.generating')}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{t('roadmap.generatingHint')}</p>
+              </div>
+            </div>
+            <div className="mt-5 space-y-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="flex items-start gap-3">
+                  <div className="skeleton h-7 w-7 shrink-0 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <div className="skeleton h-4 w-1/2" />
+                    <div className="skeleton h-12 w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -261,45 +284,62 @@ export default function RoadmapBuilder() {
               </div>
             </div>
 
-            <ol className="mt-4 space-y-3">
-              {roadmap.steps.map((step) => (
-                <li key={step.order} className="rounded-2xl border border-sand-200 bg-sand-50/60 p-3.5">
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white">
-                      {step.order}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="font-semibold text-ink">{step.title}</h4>
-                        {step.estimatedWeeks ? (
-                          <span className="chip bg-surface text-ink-muted ring-sand-200">
-                            <CalendarClock className="h-3 w-3" />
-                            {t('roadmap.weeks', { n: step.estimatedWeeks })}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{step.description}</p>
+            <ol className="relative mt-5 space-y-4 before:absolute before:bottom-3 before:start-[0.95rem] before:top-3 before:w-px before:bg-sand-200">
+              {roadmap.steps.map((step, index) => {
+                const stepResources =
+                  step.resources?.length > 0
+                    ? step.resources
+                    : (step.resourceIds || [])
+                        .map((id) => roadmap.sources?.find((source) => source.id === id))
+                        .filter(Boolean);
 
-                      {step.resources?.length > 0 && (
-                        <div className="mt-2.5 space-y-1.5">
-                          {step.resources.map((resource) => (
+                return (
+                  <li key={`${step.order || index}-${step.title}`} className="relative ps-11">
+                    <span className="absolute start-0 top-0 grid h-8 w-8 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white shadow-soft">
+                      {step.order || index + 1}
+                    </span>
+                    <div className="rounded-2xl border border-sand-200 bg-sand-50/60 p-3.5">
+                      <h4 className="font-semibold text-ink">{step.title}</h4>
+                      <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                        {step.explanation || step.description}
+                      </p>
+
+                      {stepResources.length > 0 && (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {stepResources.map((resource) => (
                             <a
                               key={resource.id}
                               href={resource.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-start gap-2 rounded-xl border border-sand-200 bg-surface px-3 py-2 text-xs font-medium text-brand-800 transition hover:border-brand-300"
+                              className="group flex h-full flex-col rounded-xl border border-sand-200 bg-surface px-3 py-2.5 transition hover:border-brand-300 hover:shadow-sm"
                             >
-                              <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                              <span className="line-clamp-2">{localized(resource.title, i18n.language)}</span>
+                              <span className="flex items-start gap-2 text-xs font-semibold text-brand-800 dark:text-brand-200">
+                                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="line-clamp-2">
+                                  {localized(resource.title, i18n.language)}
+                                </span>
+                              </span>
+                              <span className="mt-auto flex flex-wrap items-center gap-1.5 pt-2 text-[10px] text-ink-muted">
+                                <span className="chip bg-sand-50 text-ink-muted ring-sand-200">
+                                  {resource.type === 'book' ? (
+                                    <Library className="h-2.5 w-2.5" aria-hidden="true" />
+                                  ) : (
+                                    <GraduationCap className="h-2.5 w-2.5" aria-hidden="true" />
+                                  )}
+                                  {resource.type || t('roadmap.resourceFallback')}
+                                </span>
+                                {resource.sourceName && <span>{resource.sourceName}</span>}
+                                {resource.level && <span>· {resource.level}</span>}
+                              </span>
                             </a>
                           ))}
                         </div>
                       )}
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ol>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">

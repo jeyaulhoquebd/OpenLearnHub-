@@ -6,7 +6,7 @@ import { requireAuth, requireVerifiedEmail } from '../middleware/auth.js';
 import { apiError } from '../lib/http.js';
 import { sanitizeText } from '../lib/validation.js';
 import { resolveAiConfig } from '../lib/settings.js';
-import { readDailyUsage, incrementDailyUsage } from '../lib/quota.js';
+import { readDailyUsage, incrementDailyUsage, recordAiFailure } from '../lib/quota.js';
 import {
   findRelevantResources,
   generateLearnMateReply,
@@ -16,6 +16,7 @@ import {
 
 const LOCALES = ['en', 'bn', 'ur'];
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
+const MAX_CONTEXT_RESOURCES = 40;
 
 const messageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -44,14 +45,13 @@ const roadmapRequestSchema = z.object({
   locale: z.string().trim().max(8).optional()
 });
 
-// Shape we require from the model after normalisation. Enforces the
-// "recommend only existing resources" contract downstream.
+// Shape we require from the model after normalisation. `resourceIds` are
+// checked against the grounded context before anything is returned.
 const roadmapStepSchema = z.object({
-  order: z.number().int().min(1).max(50),
+  order: z.number().int().min(1).max(50).optional(),
   title: z.string().trim().min(2).max(200),
-  description: z.string().trim().min(5).max(1500),
-  resourceIds: z.array(z.string().trim().min(1).max(160)).max(6),
-  estimatedWeeks: z.number().int().min(0).max(52).nullable()
+  explanation: z.string().trim().min(5).max(1500),
+  resourceIds: z.array(z.string().trim().min(1).max(160)).min(1).max(6)
 });
 
 const roadmapPlanSchema = z.object({
@@ -83,17 +83,48 @@ const roadmapLimiter = makeLimiter({
   message: 'You have reached the roadmap hourly limit. Please try again later.'
 });
 
-/** Maps AI library error codes to HTTP responses. */
-function respondToAiError(res, error, fallbackCode, fallbackMessage) {
+function setRetryAfter(res, error) {
+  if (Number.isFinite(error?.retryAfter) && error.retryAfter > 0) {
+    res.set('Retry-After', String(error.retryAfter));
+  }
+}
+
+/** Maps AI library error codes to HTTP responses and records the failure. */
+async function respondToAiError(res, error, { action, fallbackCode, fallbackMessage }) {
+  await recordAiFailure({ action });
+  setRetryAfter(res, error);
+
   switch (error.code) {
     case 'llm_unavailable':
       return apiError(res, 503, 'llm_unavailable', 'AI is not configured yet. Please try again later.');
     case 'llm_timeout':
-      return apiError(res, 504, 'llm_timeout', 'The AI provider took too long to respond. Please try again.');
+      return apiError(
+        res,
+        504,
+        'llm_timeout',
+        'The AI provider took too long to respond. Please try again.'
+      );
     case 'llm_rate_limited':
-      return apiError(res, 429, 'llm_rate_limited', 'The AI provider is rate-limiting requests. Please try again shortly.');
+      return apiError(
+        res,
+        429,
+        'llm_rate_limited',
+        'The AI provider is rate-limiting requests right now. Please wait a moment and try again.'
+      );
     case 'llm_unauthorized':
-      return apiError(res, 502, 'llm_unauthorized', 'The AI provider rejected the configured API key. An administrator needs to check it.');
+      return apiError(
+        res,
+        502,
+        'llm_unauthorized',
+        'The AI provider rejected the configured API key. An administrator needs to check it.'
+      );
+    case 'llm_bad_request':
+      return apiError(
+        res,
+        502,
+        'llm_bad_request',
+        'The AI provider rejected the request. An administrator may need to check the selected Groq model.'
+      );
     case 'llm_invalid':
     case 'llm_empty':
       return apiError(res, 502, 'llm_invalid', 'The AI returned an unexpected response. Please try again.');
@@ -102,25 +133,46 @@ function respondToAiError(res, error, fallbackCode, fallbackMessage) {
   }
 }
 
+/** Shared "is AI usable?" check: a key must exist and the feature be enabled. */
+async function resolveReadyAi() {
+  const ai = await resolveAiConfig();
+  if (!ai.apiKey) {
+    return {
+      error: {
+        status: 503,
+        code: 'llm_unavailable',
+        message:
+          'AI is not configured yet. An administrator needs to add a Groq API key in Admin → AI Settings.'
+      }
+    };
+  }
+  if (!ai.enabled) {
+    return {
+      error: {
+        status: 503,
+        code: 'ai_disabled',
+        message: 'AI features are temporarily disabled by an administrator.'
+      }
+    };
+  }
+  return { ai };
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/ai/chat — conversational grounding assistant
 // ---------------------------------------------------------------------------
 aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
   try {
-    const ai = await resolveAiConfig();
-    if (!ai.apiKey) {
-      return apiError(
-        res,
-        503,
-        'llm_unavailable',
-        'LearnMate is not configured yet. An administrator needs to add a Gemini API key.'
-      );
-    }
-
     const parsed = chatSchema.safeParse(req.body || {});
     if (!parsed.success) {
       return apiError(res, 400, 'invalid_chat', 'The chat request was invalid.', parsed.error.flatten());
     }
+
+    const ready = await resolveReadyAi();
+    if (ready.error) {
+      return apiError(res, ready.error.status, ready.error.code, ready.error.message);
+    }
+    const { ai } = ready;
 
     const { messages, locale } = parsed.data;
     const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
@@ -134,8 +186,16 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
     try {
       reply = await generateLearnMateReply({ messages, sources, locale, ai });
     } catch (error) {
-      return respondToAiError(res, error, 'llm_error', 'The AI provider could not generate a response right now.');
+      return respondToAiError(res, error, {
+        action: 'chat',
+        fallbackCode: 'llm_error',
+        fallbackMessage: 'The AI provider could not generate a response right now.'
+      });
     }
+
+    // Chat has its own hourly limiter; it contributes to the global usage
+    // counters but does not consume the roadmap daily quota.
+    await incrementDailyUsage({ uid: req.user.uid, action: 'chat', countUser: false });
 
     return res.json({
       reply,
@@ -149,114 +209,132 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // POST /api/ai/roadmap — structured, library-grounded study roadmap
 // ---------------------------------------------------------------------------
-aiRouter.post('/roadmap', requireAuth, requireVerifiedEmail, roadmapLimiter, async (req, res, next) => {
-  try {
-    const ai = await resolveAiConfig();
-    if (!ai.apiKey) {
-      return apiError(
-        res,
-        503,
-        'llm_unavailable',
-        'AI is not configured yet. An administrator needs to add a Gemini API key in AI Settings.'
-      );
-    }
-
-    const parsed = roadmapRequestSchema.safeParse(req.body || {});
-    if (!parsed.success) {
-      return apiError(
-        res,
-        400,
-        'invalid_roadmap',
-        'Please describe your goal in a few more words and pick a level.',
-        parsed.error.flatten()
-      );
-    }
-
-    const { goal, level } = parsed.data;
-    const locale = parsed.data.language || parsed.data.locale || 'en';
-
-    const quota = await readDailyUsage({
-      uid: req.user.uid,
-      dailyLimit: config.limits.roadmapPerDay
-    });
-    if (!quota.allowed) {
-      return apiError(
-        res,
-        429,
-        'quota_exceeded',
-        `You have reached today's roadmap limit (${quota.limit}). Please try again tomorrow.`
-      );
-    }
-
-    // Ground the model in real, published resources only.
-    const matches = await findRelevantResources(goal, locale, 12);
-    if (!matches.length) {
-      return apiError(
-        res,
-        422,
-        'no_matching_resources',
-        'We could not find matching resources for that goal yet. Try a broader topic or different wording.'
-      );
-    }
-
-    let rawPlan;
+aiRouter.post(
+  '/roadmap',
+  requireAuth,
+  requireVerifiedEmail,
+  roadmapLimiter,
+  async (req, res, next) => {
     try {
-      rawPlan = await generateRoadmapPlan({ goal, level, locale, matches, ai });
+      const parsed = roadmapRequestSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        return apiError(
+          res,
+          400,
+          'invalid_roadmap',
+          'Please describe your goal in a few more words and pick a level.',
+          parsed.error.flatten()
+        );
+      }
+
+      const ready = await resolveReadyAi();
+      if (ready.error) {
+        return apiError(res, ready.error.status, ready.error.code, ready.error.message);
+      }
+      const { ai } = ready;
+
+      const { goal, level } = parsed.data;
+      const locale = parsed.data.language || parsed.data.locale || 'en';
+
+      const quota = await readDailyUsage({
+        uid: req.user.uid,
+        dailyLimit: ai.dailyLimitPerUser
+      });
+      if (!quota.allowed) {
+        return apiError(
+          res,
+          429,
+          'quota_exceeded',
+          `You have reached today's roadmap limit (${quota.limit}). Please try again tomorrow.`,
+          { limit: quota.limit, used: quota.used, date: quota.date }
+        );
+      }
+
+      // Ground the model in real, published resources only (max 40).
+      const matches = await findRelevantResources(goal, locale, MAX_CONTEXT_RESOURCES);
+      if (!matches.length) {
+        return apiError(
+          res,
+          422,
+          'no_matching_resources',
+          'We could not find matching resources for that goal yet. Try a broader topic or different wording.'
+        );
+      }
+
+      let rawPlan;
+      try {
+        rawPlan = await generateRoadmapPlan({ goal, level, locale, matches, ai });
+      } catch (error) {
+        return respondToAiError(res, error, {
+          action: 'roadmap',
+          fallbackCode: 'llm_error',
+          fallbackMessage: 'The AI provider could not build a roadmap right now.'
+        });
+      }
+
+      const normalized = normalizePlan(rawPlan);
+      const validated = normalized ? roadmapPlanSchema.safeParse(normalized) : { success: false };
+      if (!validated.success) {
+        await recordAiFailure({ action: 'roadmap' });
+        return apiError(
+          res,
+          502,
+          'llm_invalid',
+          'The AI returned an unexpected roadmap format. Please try again.'
+        );
+      }
+
+      // Drop any resource id the model invented: only ids from the grounded
+      // context are allowed through to the response.
+      const byId = new Map(matches.map((resource) => [resource.id, resource]));
+      const steps = validated.data.steps
+        .map((step, index) => {
+          const resources = step.resourceIds
+            .map((id) => byId.get(id))
+            .filter(Boolean);
+          const uniqueResources = [...new Map(resources.map((item) => [item.id, item])).values()];
+
+          return {
+            order: index + 1,
+            title: step.title,
+            explanation: step.explanation,
+            resourceIds: uniqueResources.map((resource) => resource.id),
+            resources: uniqueResources.map((resource) => resourceSummary(resource, locale))
+          };
+        })
+        .filter((step) => step.resourceIds.length > 0);
+
+      if (!steps.length) {
+        await recordAiFailure({ action: 'roadmap' });
+        return apiError(
+          res,
+          502,
+          'llm_invalid',
+          'The AI did not recommend any library resources. Please try rephrasing your goal.'
+        );
+      }
+
+      // Only count a roadmap against the daily quota once it is successfully built.
+      await incrementDailyUsage({ uid: req.user.uid, action: 'roadmap' });
+
+      return res.json({
+        goal,
+        level,
+        language: locale,
+        title: validated.data.title,
+        summary: validated.data.summary,
+        steps,
+        sources: matches.map((resource) => resourceSummary(resource, locale))
+      });
     } catch (error) {
-      return respondToAiError(res, error, 'llm_error', 'The AI provider could not build a roadmap right now.');
+      return next(error);
     }
-
-    const normalized = normalizePlan(rawPlan);
-    const validated = normalized ? roadmapPlanSchema.safeParse(normalized) : { success: false };
-    if (!validated.success) {
-      return apiError(res, 502, 'llm_invalid', 'The AI returned an unexpected roadmap format. Please try again.');
-    }
-
-    // Drop any step that cites no real resource — the model may only use the
-    // curated library, so unknown ids are discarded rather than trusted.
-    const byId = new Map(matches.map((resource) => [resource.id, resource]));
-    const steps = validated.data.steps
-      .map((step, index) => ({
-        order: step.order || index + 1,
-        title: step.title,
-        description: step.description,
-        estimatedWeeks: step.estimatedWeeks,
-        resources: step.resourceIds
-          .map((id) => byId.get(id))
-          .filter(Boolean)
-          .map((resource) => resourceSummary(resource, locale))
-      }))
-      .filter((step) => step.resources.length > 0);
-
-    if (!steps.length) {
-      return apiError(
-        res,
-        502,
-        'llm_invalid',
-        'The AI did not recommend any library resources. Please try rephrasing your goal.'
-      );
-    }
-
-    // Only count a roadmap against the daily quota once it is successfully built.
-    await incrementDailyUsage({ uid: req.user.uid, action: 'roadmap' });
-
-    return res.json({
-      goal,
-      level,
-      language: locale,
-      title: validated.data.title,
-      summary: validated.data.summary,
-      steps,
-      sources: matches.map((resource) => resourceSummary(resource, locale))
-    });
-  } catch (error) {
-    return next(error);
   }
-});
+);
 
 /**
  * Coerces the model's JSON into the exact shape zod expects, so a slightly
- * loose response (string weeks, single id instead of an array) still validates.
+ * loose response still validates. Unknown resource ids are removed later.
  */
 function normalizePlan(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -266,26 +344,22 @@ function normalizePlan(raw) {
   return {
     title: asString(raw.title, 200),
     summary: asString(raw.summary, 1200),
-    steps: rawSteps.slice(0, 10).map((step, index) => {
+    steps: rawSteps.slice(0, 8).map((step, index) => {
       const ids = Array.isArray(step?.resourceIds)
         ? step.resourceIds
         : typeof step?.resourceIds === 'string' && step.resourceIds.trim()
           ? [step.resourceIds]
           : [];
-      const weeks = Number(step?.estimatedWeeks);
-      const order = Number(step?.order);
 
       return {
-        order: Number.isFinite(order) && order >= 1 ? Math.min(Math.round(order), 50) : index + 1,
+        order: index + 1,
         title: asString(step?.title, 200),
-        description: asString(step?.description, 1500),
+        explanation: asString(step?.explanation || step?.description, 1500),
         resourceIds: ids
           .map((id) => String(id).trim())
           .filter(Boolean)
-          .slice(0, 6),
-        estimatedWeeks:
-          Number.isFinite(weeks) && weeks >= 0 && weeks <= 52 ? Math.round(weeks) : null
+          .slice(0, 6)
       };
-    })
+    }).filter((step) => step.resourceIds.length > 0)
   };
 }

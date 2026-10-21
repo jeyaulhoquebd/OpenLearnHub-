@@ -11,7 +11,7 @@ import { useSiteSettings } from '../context/SiteSettingsContext';
  *
  * Rendered instead of the normal public layout for signed-out visitors and
  * non-admins while `settings/site.maintenanceMode` is on. Administrators keep
- * the full site and can manage settings from `/admin/settings`.
+ * the full site and can manage settings from `/admin/site-settings`.
  */
 export default function MaintenancePage() {
   const { t } = useTranslation();

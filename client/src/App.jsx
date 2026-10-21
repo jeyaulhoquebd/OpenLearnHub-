@@ -84,8 +84,12 @@ export default function App() {
                   <Route path="reports" element={withSuspense(<AdminReportsPage />)} />
                   <Route path="link-checker" element={withSuspense(<AdminLinkCheckerPage />)} />
                   <Route path="import-export" element={withSuspense(<AdminImportExportPage />)} />
-                  <Route path="ai" element={withSuspense(<AdminAiSettingsPage />)} />
-                  <Route path="settings" element={withSuspense(<AdminSiteSettingsPage />)} />
+                  <Route path="ai-settings" element={withSuspense(<AdminAiSettingsPage />)} />
+                  {/* Old bookmarks keep working after the route rename. */}
+                  <Route path="ai" element={<Navigate to="/admin/ai-settings" replace />} />
+                  <Route path="site-settings" element={withSuspense(<AdminSiteSettingsPage />)} />
+                  {/* Old bookmarks keep working after the route rename. */}
+                  <Route path="settings" element={<Navigate to="/admin/site-settings" replace />} />
                   <Route path="audit-log" element={withSuspense(<AdminAuditLogPage />)} />
                   {/* Unknown admin URLs fall back to the dashboard, not the public 404. */}
                   <Route path="*" element={<Navigate to="/admin" replace />} />

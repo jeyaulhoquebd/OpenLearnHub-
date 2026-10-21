@@ -27,16 +27,18 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
-      - key: GEMINI_MODEL
-        value: gemini-2.5-flash
-      - key: GEMINI_TIMEOUT_MS
-        value: "30000"
-      - key: GEMINI_MAX_OUTPUT_TOKENS
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_TIMEOUT_MS
+        value: "15000"
+      - key: GROQ_MAX_OUTPUT_TOKENS
         value: "1024"
-      - key: GEMINI_ROADMAP_MAX_OUTPUT_TOKENS
+      - key: GROQ_ROADMAP_MAX_OUTPUT_TOKENS
         value: "2048"
+      - key: AI_DAILY_LIMIT_PER_USER
+        value: "10"
       # AES-256-GCM key for secrets stored in Firestore settings/ai.
       # Generate with: openssl rand -hex 32
       - key: SETTINGS_ENCRYPTION_KEY
@@ -47,7 +49,5 @@ services:
         value: "25"
       - key: ROADMAP_RATE_LIMIT_PER_HOUR
         value: "10"
-      - key: ROADMAP_DAILY_QUOTA
-        value: "20"
       - key: GLOBAL_RATE_LIMIT_PER_15_MIN
         value: "400"

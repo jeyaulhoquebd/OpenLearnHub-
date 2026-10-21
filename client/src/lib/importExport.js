@@ -141,7 +141,10 @@ export function normalizeImportRow(raw = {}) {
   const description = mapObject(raw.description);
   const language = raw.language ?? raw.languages;
   const platform = raw.platform ?? raw.platforms;
-  const tags = Array.isArray(raw.tags) ? raw.tags.join(', ') : firstString(raw.tags);
+  // The server writes list values with `|`, while the form expects a single
+  // comma-separated tag string. Accept arrays, pipes, semicolons and commas so
+  // a CSV exported from this panel can be re-imported unchanged.
+  const tags = splitList(raw.tags).join(', ');
 
   return {
     type: firstString(raw.type) || 'course',
