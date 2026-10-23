@@ -151,6 +151,16 @@ export async function listAuditLogs({
     return row;
   });
 
+  // Enrich before filtering so an admin filter can match the email/name of
+  // older entries that only stored a UID. Older logs may have neither field.
+  rows = await enrichAdmins(rows);
+  rows.forEach((row) => {
+    const entry = admins.get(row.adminUid);
+    if (!entry) return;
+    entry.email = entry.email || row.adminEmail;
+    entry.name = entry.name || row.adminName;
+  });
+
   rows = rows.filter((row) => {
     if (action && row.action !== action) return false;
     if (targetType && row.targetType !== targetType) return false;
@@ -160,8 +170,6 @@ export async function listAuditLogs({
     if (toDate && created > toDate.getTime()) return false;
     return true;
   });
-
-  rows = await enrichAdmins(rows);
 
   const total = rows.length;
   const offset = decodeCursor(cursor);

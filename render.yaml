@@ -27,6 +27,12 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: YOUTUBE_TIMEOUT_MS
+        value: "20000"
+      - key: YOUTUBE_MAX_PLAYLIST_ITEMS
+        value: "5000"
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL

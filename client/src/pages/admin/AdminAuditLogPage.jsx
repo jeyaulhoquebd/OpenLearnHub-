@@ -51,6 +51,10 @@ export default function AdminAuditLogPage() {
     () => Object.values(filters).some((value) => String(value || '').trim()),
     [filters]
   );
+  const hasDraftFilters = useMemo(
+    () => Object.values(draft).some((value) => String(value || '').trim()),
+    [draft]
+  );
 
   const load = useCallback(async () => {
     if (!user) {
@@ -327,7 +331,7 @@ export default function AdminAuditLogPage() {
           <button
             type="button"
             onClick={clearFilters}
-            disabled={loading || !hasFilters}
+            disabled={loading || (!hasFilters && !hasDraftFilters)}
             className="btn-secondary btn-sm"
           >
             <FilterX className="h-3.5 w-3.5" aria-hidden="true" />

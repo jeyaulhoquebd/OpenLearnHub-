@@ -47,10 +47,13 @@ export const ANNOUNCEMENT_TYPES = ['info', 'warning', 'success', 'critical'];
 
 function cleanMap(value, fallback) {
   const source = value && typeof value === 'object' ? value : {};
+  // A missing translation falls back to the default, but an explicitly empty
+  // one stays empty so an admin can clear Bangla/Urdu and let `localized()`
+  // fall back to English on the public site.
   return {
-    en: typeof source.en === 'string' && source.en.trim() ? source.en : fallback.en,
-    bn: typeof source.bn === 'string' && source.bn.trim() ? source.bn : fallback.bn,
-    ur: typeof source.ur === 'string' && source.ur.trim() ? source.ur : fallback.ur
+    en: typeof source.en === 'string' ? source.en.slice(0, 160) : fallback.en,
+    bn: typeof source.bn === 'string' ? source.bn.slice(0, 160) : fallback.bn,
+    ur: typeof source.ur === 'string' ? source.ur.slice(0, 160) : fallback.ur
   };
 }
 
@@ -69,7 +72,7 @@ export function normalizeSiteSettings(raw = {}) {
     socialLinks: Object.fromEntries(
       Object.keys(defaults.socialLinks).map((key) => [
         key,
-        typeof social[key] === 'string' ? social[key].slice(0, 600) : ''
+        typeof social[key] === 'string' ? social[key].slice(0, 600) : defaults.socialLinks[key]
       ])
     ),
     announcement: {

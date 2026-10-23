@@ -2,14 +2,17 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, Flag, Globe2, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 import { OWNER } from '../lib/owner';
 
 export default function ContactPage() {
   const { t } = useTranslation();
+  const { settings } = useSiteSettings();
   usePageMeta(t('contact.title'), t('contact.subtitle'));
 
-  const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
+  const contactEmail =
+    settings.contactEmail || import.meta.env.VITE_CONTACT_EMAIL || OWNER.email;
+  const legalEmail = settings.legalEmail || import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
 
   const channels = [
     {

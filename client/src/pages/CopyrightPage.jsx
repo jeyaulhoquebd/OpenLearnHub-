@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import LegalLayout from '../components/LegalLayout';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 import { OWNER } from '../lib/owner';
 
 export default function CopyrightPage() {
   const { t } = useTranslation();
-  const legalEmail = import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
+  const { settings } = useSiteSettings();
+  const legalEmail = settings.legalEmail || import.meta.env.VITE_LEGAL_EMAIL || OWNER.email;
   usePageMeta(t('legal.copyrightTitle'), t('legal.copyrightSubtitle'));
 
   return (

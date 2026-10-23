@@ -44,8 +44,9 @@ app.use(
 );
 
 // Import batches can carry up to 400 resources; the file itself is capped at
-// 2 MB in the browser and every field is bounded again by zod on the server.
-app.use(express.json({ limit: '2mb' }));
+// 2 MB in the browser, JSON escaping adds overhead, and every field is bounded
+// again by zod on the server.
+app.use(express.json({ limit: '4mb' }));
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
 const globalLimiter = rateLimit({

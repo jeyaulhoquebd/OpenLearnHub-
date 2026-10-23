@@ -203,7 +203,9 @@ export async function parseImportFile(file) {
   if (extension === 'json') {
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      // Accept JSON saved with a UTF-8 BOM (common when a file is edited in
+      // Excel or a Windows editor) without confusing it with a parse error.
+      parsed = JSON.parse(text.replace(/^\uFEFF/, ''));
     } catch {
       throw new Error('admin.importExport.errors.parseError');
     }

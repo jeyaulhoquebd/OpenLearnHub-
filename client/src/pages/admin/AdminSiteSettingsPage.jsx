@@ -8,7 +8,6 @@ import {
   ExternalLink,
   Globe2,
   Loader2,
-  Mail,
   Megaphone,
   RefreshCw,
   Save,
@@ -429,7 +428,9 @@ export default function AdminSiteSettingsPage() {
 
           <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sand-200 bg-surface/95 p-3 shadow-soft backdrop-blur">
             <p className="flex items-center gap-1.5 text-xs text-ink-muted">
-              {savedAt ? (
+              {isDirty ? (
+                t('admin.siteSettings.unsaved')
+              ) : savedAt ? (
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
                   {t('admin.siteSettings.savedAt', {
@@ -439,8 +440,6 @@ export default function AdminSiteSettingsPage() {
                     }).format(savedAt)
                   })}
                 </>
-              ) : isDirty ? (
-                t('admin.siteSettings.unsaved')
               ) : (
                 <span className="inline-flex items-center gap-1.5">
                   <Settings className="h-3.5 w-3.5" aria-hidden="true" />

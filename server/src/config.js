@@ -55,6 +55,13 @@ export const config = {
     roadmapMaxOutputTokens: parseNumber(process.env.GROQ_ROADMAP_MAX_OUTPUT_TOKENS, 2048),
     dailyLimitPerUser: parseNumber(process.env.AI_DAILY_LIMIT_PER_USER, 10)
   },
+  // YouTube Data API — server-side only. The public site uses YouTube's
+  // official IFrame player, so the key is never sent to the browser.
+  youtube: {
+    apiKey: process.env.YOUTUBE_API_KEY || '',
+    timeoutMs: parseNumber(process.env.YOUTUBE_TIMEOUT_MS, 20000),
+    maxPlaylistItems: parseNumber(process.env.YOUTUBE_MAX_PLAYLIST_ITEMS, 5000)
+  },
   // Secret used to encrypt the admin-managed Groq key at rest.
   // Recommended value: `openssl rand -hex 32` (64 hex chars = 32 bytes).
   settings: {

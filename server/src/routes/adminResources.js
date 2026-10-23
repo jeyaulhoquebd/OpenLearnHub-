@@ -347,7 +347,23 @@ adminResourcesRouter.put('/:id', async (req, res, next) => {
       type: payload.type,
       status: payload.status,
       slug,
-      titleChanged
+      titleChanged,
+      before: {
+        title: existing.title?.en || '',
+        type: existing.type || '',
+        status: existing.status || '',
+        category: existing.category || '',
+        sourceUrl: existing.sourceUrl || '',
+        featured: existing.featured === true
+      },
+      after: {
+        title: payload.title.en,
+        type: payload.type,
+        status: payload.status,
+        category: payload.category,
+        sourceUrl: payload.sourceUrl,
+        featured: payload.featured === true
+      }
     });
 
     return res.json({ id, slug });

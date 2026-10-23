@@ -126,10 +126,11 @@ export const siteSettingsSchema = z
   });
 
 function cleanMap(value, max) {
+  // Keep empty translations when saving so an admin can clear the Bangla or
+  // Urdu tagline/announcement and let the public site fall back to English.
   const output = {};
   ['en', 'bn', 'ur'].forEach((code) => {
-    const text = sanitizeText(value?.[code] || '', { max });
-    if (text) output[code] = text;
+    output[code] = sanitizeText(value?.[code] || '', { max });
   });
   return output;
 }
@@ -144,25 +145,31 @@ export function normalizeSiteSettings(raw = {}) {
   const social = raw.socialLinks && typeof raw.socialLinks === 'object' ? raw.socialLinks : {};
   const announcement = raw.announcement && typeof raw.announcement === 'object' ? raw.announcement : {};
   const text = announcement.text && typeof announcement.text === 'object' ? announcement.text : {};
+  const tagline = raw.tagline && typeof raw.tagline === 'object' ? raw.tagline : {};
 
   return {
     siteName: sanitizeText(raw.siteName || defaults.siteName, { max: 80 }),
-    tagline: { ...defaults.tagline, ...cleanMap(raw.tagline, 160) },
+    tagline: {
+      en: sanitizeText(tagline.en ?? defaults.tagline.en, { max: 160 }),
+      bn: sanitizeText(tagline.bn ?? defaults.tagline.bn, { max: 160 }),
+      ur: sanitizeText(tagline.ur ?? defaults.tagline.ur, { max: 160 })
+    },
     contactEmail: sanitizeText(raw.contactEmail || defaults.contactEmail, { max: 200 }),
     legalEmail: sanitizeText(raw.legalEmail || defaults.legalEmail, { max: 200 }),
-    socialLinks: {
-      ...defaults.socialLinks,
-      ...Object.fromEntries(
-        Object.entries(defaults.socialLinks).map(([key, fallback]) => [
-          key,
-          sanitizeText(social[key] || fallback, { max: 600 })
-        ])
-      )
-    },
+    socialLinks: Object.fromEntries(
+      Object.entries(defaults.socialLinks).map(([key, fallback]) => [
+        key,
+        social[key] === undefined ? fallback : sanitizeText(social[key] || '', { max: 600 })
+      ])
+    ),
     announcement: {
       enabled: announcement.enabled === true,
       type: ANNOUNCEMENT_TYPES.includes(announcement.type) ? announcement.type : 'info',
-      text: { ...defaults.announcement.text, ...cleanMap(text, 300) }
+      text: {
+        en: sanitizeText(text.en ?? '', { max: 300 }),
+        bn: sanitizeText(text.bn ?? '', { max: 300 }),
+        ur: sanitizeText(text.ur ?? '', { max: 300 })
+      }
     },
     maintenanceMode: raw.maintenanceMode === true
   };

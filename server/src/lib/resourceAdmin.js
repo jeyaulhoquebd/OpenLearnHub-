@@ -2,8 +2,13 @@ import { z } from 'zod';
 import { sanitizeText } from './validation.js';
 import {
   YOUTUBE_PLAYLIST_ID_RE,
+  YOUTUBE_PLAYLIST_ITEM_ID_RE,
+  YOUTUBE_VIDEO_ID_RE,
+  formatDuration,
   parseYouTubePlaylistId,
-  youtubePlaylistUrl
+  youtubeEmbedUrl,
+  youtubePlaylistUrl,
+  youtubeVideoUrl
 } from './youtube.js';
 
 /**
@@ -67,6 +72,30 @@ const optionalHttpUrl = (max) =>
       message: 'Must be a valid http:// or https:// URL.'
     });
 
+/**
+ * One entry in an imported YouTube course. The server derives the canonical
+ * watch/embed URLs from `videoId`, so an admin can never inject an arbitrary
+ * iframe source. This is metadata only — no video bytes are stored.
+ */
+export const courseVideoInputSchema = z.object({
+  id: z.string().trim().max(128).optional().default(''),
+  videoId: z
+    .string()
+    .trim()
+    .regex(YOUTUBE_VIDEO_ID_RE, 'Enter a valid YouTube video id.'),
+  position: z.coerce.number().int().min(0).max(10000).optional().default(0),
+  title: z.string().trim().min(1).max(300),
+  description: z.string().trim().max(2000).optional().default(''),
+  thumbnailUrl: z.string().trim().max(800).optional().default(''),
+  durationSeconds: z.coerce.number().int().min(0).max(86400).optional().default(0),
+  durationText: z.string().trim().max(20).optional().default(''),
+  publishedAt: z.string().trim().max(40).optional().default(''),
+  channelTitle: z.string().trim().max(160).optional().default(''),
+  available: z.boolean().optional().default(true),
+  embeddable: z.boolean().optional().default(true),
+  privacyStatus: z.string().trim().max(20).optional().default('')
+});
+
 export const resourceInputSchema = z
   .object({
     type: z.enum(RESOURCE_TYPES),
@@ -92,6 +121,12 @@ export const resourceInputSchema = z
       .refine((value) => !value || YOUTUBE_PLAYLIST_ID_RE.test(value), {
         message: 'Enter a valid YouTube playlist URL or playlist ID.'
       }),
+    youtubePlaylistTitle: z.string().trim().max(300).optional().default(''),
+    youtubeChannelTitle: z.string().trim().max(160).optional().default(''),
+    youtubeChannelId: z.string().trim().max(160).optional().default(''),
+    // Undefined means "leave the stored lesson list unchanged" on update.
+    // An empty array explicitly clears it.
+    youtubeVideos: z.array(courseVideoInputSchema).max(5000).optional(),
 
     license: z.string().trim().min(2).max(160),
     licenseUrl: optionalHttpUrl(600),
@@ -189,6 +224,15 @@ export function normalizeResourceInput(input) {
     sourceName: sanitizeText(input.sourceName, { max: 160 }),
     sourceUrl,
     youtubePlaylistId: youtubePlaylistId || null,
+    youtubePlaylistTitle: input.youtubePlaylistTitle
+      ? sanitizeText(input.youtubePlaylistTitle, { max: 300 })
+      : null,
+    youtubeChannelTitle: input.youtubeChannelTitle
+      ? sanitizeText(input.youtubeChannelTitle, { max: 160 })
+      : null,
+    youtubeChannelId: input.youtubeChannelId
+      ? sanitizeText(input.youtubeChannelId, { max: 160 })
+      : null,
 
     license: sanitizeText(input.license, { max: 160 }),
     licenseUrl: input.licenseUrl ? sanitizeText(input.licenseUrl, { max: 600 }) : null,

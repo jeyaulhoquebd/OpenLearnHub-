@@ -477,7 +477,8 @@ export async function importResources(db, { rows = [], mode = 'skip', adminUid, 
     await batch.commit();
   }
 
-  results.push(...writes);
+  // Do not leak Firestore DocumentReference objects through the API response.
+  results.push(...writes.map(({ ref, ...item }) => item));
   results.sort((a, b) => a.index - b.index);
 
   const summary = results.reduce(

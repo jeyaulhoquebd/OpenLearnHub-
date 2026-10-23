@@ -420,7 +420,8 @@ data keeps rendering during the migration.
 | `users/{uid}/roadmaps/{id}` | owner only | owner only (bounded content, no updates) |
 | `aiUsage/{uid_YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; per-user daily AI quota) |
 | `aiUsage/{YYYY-MM-DD}` | **nobody** | **nobody** (Admin SDK only; global request/failure counters) |
-| `settings/{id}` | **nobody** | **nobody** (Admin SDK only) |
+| `settings/site` | **public** (banner + maintenance only) | **Express API only** (Admin SDK) |
+| `settings/{other}` | **nobody** | **nobody** (Admin SDK only; includes `settings/ai`) |
 | `auditLogs/{id}` | **nobody** | **nobody** (Admin SDK only; admin action trail) |
 
 `categories` seed data lives in `firebase/seed/categories.json` and
@@ -453,6 +454,33 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 }
 ```
 
+### `settings/site` (public read, server write)
+
+The only settings document readable by the browser. It contains public site
+configuration and never an API key or an administrator identifier:
+
+```jsonc
+{
+  "siteName": "OpenLearn Hub",
+  "tagline": { "en": "Knowledge for Everyone", "bn": "…", "ur": "…" },
+  "contactEmail": "…",
+  "legalEmail": "…",
+  "socialLinks": { "facebook": "", "twitter": "", "instagram": "", "youtube": "", "linkedin": "", "github": "", "website": "…" },
+  "announcement": {
+    "enabled": false,
+    "type": "info", // info | warning | success | critical
+    "text": { "en": "", "bn": "", "ur": "" }
+  },
+  "maintenanceMode": false
+}
+```
+
+The public layout reads this document directly to show the announcement banner
+and, for signed-out visitors and non-admins, the maintenance screen. Saving is
+restricted to `POST /api/admin/settings/site`; `firestore.rules` denies every
+client write. Sign-in (`/login`, `/forgot-password`) stays reachable during
+maintenance so an administrator can turn it off again.
+
 ### Rules summary
 
 - Published resources: public read.
@@ -463,7 +491,9 @@ Written exclusively by the Express API through the Admin SDK. Clients are denied
 - Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`.
 - Roadmaps: `users/{uid}/roadmaps` is owner-only read/delete; create is limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps); updates are denied. The top-level `roadmaps` collection is legacy and no longer written.
 - Reviews: verified email required, one per resource, owner-only edits.
-- `settings/*`: completely denied to clients (the server's Admin SDK writes it).
+- `settings/site`: public read so every visitor can see the banner and maintenance switch; all writes are server-only.
+- Other `settings/*` (including `settings/ai`): completely denied to clients (the server's Admin SDK writes them).
+- `auditLogs/*`: completely denied to clients; only admins can read them through `GET /api/admin/audit-logs`.
 - Storage: images under 2 MB for community thumbnails (`thumbnails/{uid}/…`) and images under 1 MB (WebP/JPEG/PNG) for admin resource thumbnails (`thumbnails/admin/{uid}/…`, admin claim only).
 - Default deny for everything else.
 
@@ -521,6 +551,13 @@ Base URL: `http://localhost:8080` in development.
 | `POST` | `/api/admin/check-links` | Admin claim | Start a background job; `{ ids }` checks selected resources, omit it for the whole library (409 when a job is running) |
 | `GET` | `/api/admin/check-links/:jobId` | Admin claim | Live job progress and completed rows |
 | `POST` | `/api/admin/check-links/recheck` | Admin claim | `{ id }` — synchronously re-check one resource and save the result |
+| `GET` | `/api/admin/import-export/export/:kind` | Admin claim | Server-generated `resources`, `categories` or `alternatives` export (`format=json|csv`; CSV is resources-only) |
+| `GET` | `/api/admin/import-export/template` | Admin claim | Downloadable JSON/CSV sample with trilingual fields |
+| `POST` | `/api/admin/import/duplicates` | Admin claim | Existing resources keyed by trimmed `sourceUrl` (max 400 URLs) |
+| `POST` | `/api/admin/import` | Admin claim | Import up to 400 validated rows; new rows are drafts (`mode: skip\|update`) |
+| `GET` | `/api/admin/audit-logs` | Admin claim | Read-only audit trail with `admin`, `action`, `targetType`, `from`, `to`, `cursor`, `limit` |
+| `GET` | `/api/admin/settings/site` | Admin claim | Current normalised `settings/site` document |
+| `POST` | `/api/admin/settings/site` | Admin claim | Validate and save site name, tagline, contact/social links, banner and maintenance mode |
 
 ### `POST /api/reports`
 
@@ -689,7 +726,9 @@ Admin access comes **only** from the `admin: true` custom claim (set with `scrip
 - **Guard:** `components/admin/AdminRoute.jsx` waits for auth, re-checks the current ID token, and redirects non-admins home with a translated "Access denied" toast. The public navbar shows a small **Admin** link to admins only.
 - **Shell:** `components/admin/AdminLayout.jsx` renders a collapsible sidebar (state kept in `localStorage`), a mobile drawer, breadcrumbs, theme and language switches, a report counter, and the account menu. Every admin screen is `React.lazy`-loaded.
 - **UI kit:** `components/admin/ui/` provides `PageHeader`, `StatCard`, `DataTable`, `ConfirmDialog`, `Modal`, `Drawer`, `StatusBadge`, `SearchInput`, `FormField`, `ImageUploader`, `Tabs` and the shared toast hook.
-- **Audit trail:** `server/src/lib/audit.js` appends every privileged action to the server-only `auditLogs` collection. Entries are never readable from a browser, and failed logging never breaks the action itself.
+- **Audit trail:** `server/src/lib/audit.js` appends every privileged action to the server-only `auditLogs` collection, including the acting admin's UID, email and display name. Entries are never readable from a browser, and failed logging never breaks the action itself. `/admin/audit-log` reads through `GET /api/admin/audit-logs`, which scans the newest 1,000 entries, filters by admin/action/target/date in memory, paginates with an opaque offset cursor and shows the same warnings when the scan cap is reached. The details expander pretty-prints `before`/`after` summaries (resource updates and site-settings saves) and other flat details.
+- **Import / export:** exports and templates are generated server-side under `/api/admin/import-export`, so drafts and internal fields never depend on broad client reads. The browser parses the 2 MB upload, previews every row with the resource-form zod schema, and posts only valid rows in batches of 400. Duplicate detection matches trimmed `sourceUrl`; `skip` leaves existing resources untouched and `update` refreshes them while preserving status/counters. New rows are always drafts. The final summary and downloadable CSV error report cover created/updated/skipped/failed rows.
+- **Site settings:** `/admin/site-settings` edits `settings/site` through the validated Express endpoint. The public layout reads the same document directly for the site name/tagline, contact and social links (footer, contact and legal pages), dismissible announcement banner, and maintenance gate. Non-admins see the maintenance page (sign-in remains reachable); admins keep full access. Only public fields are stored, and the acting admin is recorded in the audit log instead of the public document.
 - **Stats:** `GET /api/admin/stats` (Admin SDK) returns counts via Firestore `count()` aggregations, 30-day series, top resources, latest activity and the auth-provider split (up to 5,000 accounts, marked approximate past the cap). The response is cached in memory for 60 seconds; the dashboard's **Refresh** button sends `?refresh=1` to bypass the cache.
 - **Charts:** the dashboard uses `recharts` (its own `charts` chunk, loaded only with `/admin`). Series colours follow the navy → purple ramp, while axes and grids read CSS variables so light and dark mode need no re-render. In Urdu the time axes are reversed and the Y axis moves to the right.
 - **Resources CRUD:** all writes go through `/api/admin/resources` (never direct Firestore writes from the panel), so one server-side zod schema, the unique-slug generator, the piracy blocklist (`server/config/blocklist.js`) and the audit log apply to every save. Software listings must have a licence and an official `sourceUrl`; known piracy domains, crack keywords and third-party software mirrors are rejected with a `422` explaining the match.

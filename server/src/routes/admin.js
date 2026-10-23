@@ -133,6 +133,7 @@ adminRouter.post('/settings/site', async (req, res, next) => {
       );
     }
 
+    const before = await getSiteSettings();
     let settings;
     try {
       settings = await saveSiteSettings(parsed.data);
@@ -151,7 +152,21 @@ adminRouter.post('/settings/site', async (req, res, next) => {
         siteName: settings.siteName,
         maintenanceMode: settings.maintenanceMode,
         announcementEnabled: settings.announcement.enabled,
-        announcementType: settings.announcement.type
+        announcementType: settings.announcement.type,
+        before: {
+          siteName: before.siteName,
+          contactEmail: before.contactEmail,
+          maintenanceMode: before.maintenanceMode,
+          announcementEnabled: before.announcement.enabled,
+          announcementType: before.announcement.type
+        },
+        after: {
+          siteName: settings.siteName,
+          contactEmail: settings.contactEmail,
+          maintenanceMode: settings.maintenanceMode,
+          announcementEnabled: settings.announcement.enabled,
+          announcementType: settings.announcement.type
+        }
       }
     });
 

@@ -180,7 +180,7 @@ export default function AdminImportExportPage() {
   }
 
   async function loadFile(nextFile) {
-    if (!nextFile) return;
+    if (!nextFile || importing || parsing) return;
     setParsing(true);
     setParseError('');
     setImportError('');
@@ -204,7 +204,7 @@ export default function AdminImportExportPage() {
   }
 
   function resetImport() {
-    if (importing) return;
+    if (importing || parsing) return;
     setFile(null);
     setRows([]);
     setParseError('');
@@ -218,7 +218,7 @@ export default function AdminImportExportPage() {
   }
 
   async function handleImport() {
-    if (importing || !rows.length) return;
+    if (importing || parsing || checkingDuplicates || !rows.length) return;
     const validRows = rows.filter((row) => row.valid);
     if (!validRows.length) {
       setImportError(t('admin.importExport.errors.allInvalid'));
@@ -497,7 +497,7 @@ export default function AdminImportExportPage() {
             <button
               type="button"
               onClick={resetImport}
-              disabled={importing}
+              disabled={importing || parsing}
               className="btn-secondary btn-sm"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -516,10 +516,13 @@ export default function AdminImportExportPage() {
           onDrop={(event) => {
             event.preventDefault();
             setDragging(false);
+            if (importing || parsing) return;
             const dropped = event.dataTransfer.files?.[0];
             if (dropped) loadFile(dropped);
           }}
           className={`mt-5 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed px-6 py-9 text-center transition ${
+            importing ? 'cursor-not-allowed opacity-60' : ''
+          } ${
             dragging
               ? 'border-accent-500 bg-accent-50/70 dark:bg-accent-500/10'
               : 'border-sand-300 bg-sand-50/60 hover:border-brand-300 hover:bg-sand-50'
@@ -549,6 +552,7 @@ export default function AdminImportExportPage() {
             id="import-file"
             type="file"
             accept=".json,.csv,application/json,text/csv"
+            disabled={importing || parsing}
             className="sr-only"
             onChange={(event) => loadFile(event.target.files?.[0])}
           />
@@ -708,7 +712,7 @@ export default function AdminImportExportPage() {
               <button
                 type="button"
                 onClick={handleImport}
-                disabled={importing || stats.valid === 0}
+                disabled={importing || parsing || checkingDuplicates || stats.valid === 0}
                 className="btn-primary"
               >
                 {importing ? (
