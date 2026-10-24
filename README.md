@@ -55,7 +55,7 @@ OpenLearn Hub is designed, built, and maintained by **Jeyaul Hoque**.
 - **Community submissions** that enter a moderation queue (`status: "pending"`).
 - **Admin dashboard** for approving/rejecting submissions, a reports queue with legal-priority highlighting and one-click unpublish, plus a link checker that flags dead official links.
 - **Report this resource** on every card and detail page for copyright, piracy, broken-link, and accuracy issues.
-- **LearnMate**, an AI study guide whose key lives only on the server and which is grounded in the curated library.
+- **LearnMate**, a public-site guide and study assistant that links to relevant pages and grounds resource recommendations in the published library. It cannot access admin pages or private account data.
 - **Three languages** — English, Bangla, and Urdu (RTL). Hindi can be added later without restructuring.
 - **Light and dark mode** with a navbar toggle that follows the system preference until you choose one, then remembers it.
 
@@ -96,7 +96,9 @@ The preview server runs at `http://localhost:4173`. In preview mode the AI assis
 | Layer | Choice |
 | --- | --- |
 | Frontend | React 18, Vite 5, React Router 6, Tailwind CSS 3, react-i18next, lucide-react |
-| Auth / data | Firebase Web SDK v11 (Auth, Firestore, Storage) |
+| Auth / data | Firebase Web SDK v11 (Auth, Firestore) |
+| Images | Cloudinary unsigned uploads (thumbnail delivery URLs stored in Firestore) |
+| Courses | YouTube Data API v3 (server-side import) + official IFrame Player API (on-site playback) |
 | Backend | Node.js 20+, Express 4, firebase-admin, zod, helmet, express-rate-limit |
 | Hosting | Firebase Hosting (frontend); Render / Railway / Cloud Run (API) |
 | AI | Groq via the official `groq-sdk` package, called server-side only |
@@ -141,8 +143,10 @@ There are **no Cloud Functions**. The API is a normal Express service so it can 
 ## Prerequisites
 
 - **Node.js 20+** and npm 9+
-- A **Firebase project** (Blaze plan is not required for Hosting/Firestore/Storage at this scale, but check current quotas)
+- A **Firebase project** (Blaze plan is not required for Hosting/Firestore at this scale, but check current quotas)
 - **Firebase CLI** for rules and hosting: `npm install -g firebase-tools` (or use `npx firebase-tools`)
+- A **YouTube Data API v3 key** for admin playlist imports ([Google Cloud credentials](https://console.cloud.google.com/apis/credentials))
+- A **Cloudinary account** with an unsigned upload preset for thumbnails ([console.cloudinary.com](https://console.cloudinary.com/))
 - Optional: a **Groq API key** for LearnMate ([console.groq.com/keys](https://console.groq.com/keys))
 
 ## Quick start
@@ -172,7 +176,7 @@ Without `.env` files you get preview mode. To enable accounts and moderation, co
 
 - **Authentication** → Sign-in method → enable **Email/Password**, **Google**, **GitHub**, and **Apple**.
 - **Firestore Database** → create a database (production mode is fine; rules come next).
-- **Storage** → create a bucket (used only for optional thumbnails).
+- Firebase Storage is **not required** for new installs. Thumbnails go to Cloudinary; any existing Storage bucket is kept read-only for legacy images.
 
 ### 3. Configure the client
 
@@ -180,7 +184,16 @@ Without `.env` files you get preview mode. To enable accounts and moderation, co
 cp client/.env.example client/.env
 ```
 
-Fill in the six required `VITE_FIREBASE_*` values from the web app config (`VITE_FIREBASE_MEASUREMENT_ID` is optional — it only enables Analytics in production builds). Keep `VITE_API_URL=http://localhost:8080` for local development.
+Fill in the required `VITE_FIREBASE_*` values from the web app config (`VITE_FIREBASE_MEASUREMENT_ID` is optional — it only enables Analytics in production builds; `VITE_FIREBASE_STORAGE_BUCKET` is only needed for legacy Storage URLs). Keep `VITE_API_URL=http://localhost:8080` for local development.
+
+Add the public Cloudinary values too:
+
+```dotenv
+VITE_CLOUDINARY_CLOUD_NAME=y6fui3kz
+VITE_CLOUDINARY_UPLOAD_PRESET=openlearnhub
+```
+
+These are public by design because unsigned uploads run in the browser. Never put the Cloudinary API secret in a `VITE_*` variable.
 
 > `VITE_*` values are **public** by design (they identify the Firebase project). They are not secrets. Never put the LLM key or a service-account key in a `VITE_*` variable.
 
@@ -219,6 +232,14 @@ GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json
 Never commit `serviceAccount.json` or `.env` — both are ignored by `.gitignore`.
 
 Set `ADMIN_EMAILS` to your own email. Set `CLIENT_ORIGIN` to your frontend origin(s), comma-separated.
+
+For on-site YouTube courses, enable **YouTube Data API v3** in Google Cloud and add the key to `server/.env`:
+
+```dotenv
+YOUTUBE_API_KEY=your-youtube-data-api-key
+```
+
+The key is read only by the Express server. It is never sent to the browser. Playback uses YouTube's official IFrame player, so video bytes are never downloaded or rehosted.
 
 ### 5. Deploy Firestore and Storage rules
 
@@ -298,10 +319,11 @@ How it behaves:
 - Resolution order: Firestore `settings/ai` → `GROQ_API_KEY`. If neither is set, the API returns `503 llm_unavailable` with a clear “AI is not configured” message.
 - The admin can switch AI features off entirely; both endpoints then return `503 ai_disabled`.
 - Chat is rate-limited per user (`AI_RATE_LIMIT_PER_HOUR`, default 25/hour); roadmaps have both an hourly limit (`ROADMAP_RATE_LIMIT_PER_HOUR`, default 10) and a per-user daily limit from `settings/ai` (`AI_DAILY_LIMIT_PER_USER` is the fallback, default 10), counted in `aiUsage/{uid}_{YYYY-MM-DD}`.
-- Up to **40** matching published resources are retrieved from Firestore and passed to Groq as the only allowed context. The model cannot cite anything outside that list.
-- `POST /api/ai/chat` returns a free-form `reply` plus `sources`.
+- Up to **40** matching published resources are retrieved from Firestore and passed to Groq as the only allowed resource context. The model cannot cite anything outside that list.
+- Chat also receives a small, maintained guide to public pages and features. It returns relevant `sitePages` links from a fixed public-route allowlist; admin pages, source code, and private account data are excluded.
+- `POST /api/ai/chat` returns a free-form `reply`, published-resource `sources`, and verified public `sitePages`.
 - `POST /api/ai/roadmap` requests strict JSON (`response_format: json_object`), validates it with zod, drops any unknown resource id, and returns `title`, `summary`, and `steps[{ title, explanation, resourceIds[] }]` plus resolved resource cards. Every step links to real curated resources.
-- Both prompts instruct the model to treat user text as data, not instructions, and to ignore attempts to change the rules or reveal the prompt.
+- Both prompts instruct the model to treat user text as data, not instructions, and to ignore attempts to change the rules or reveal the prompt. The chat prompt also excludes admin dashboard information and personal account data.
 - Groq calls have a hard 15s timeout. A Groq `429` becomes a friendly response with a `Retry-After` header when the provider supplies one.
 - The key never reaches the browser; there is no `VITE_GROQ_*` variable, and `settings/ai` is unreadable from clients by rule.
 
@@ -488,13 +510,15 @@ maintenance so an administrator can turn it off again.
 - Resource create: signed-in user, `status: "pending"`, `featured: false`, `title`/`description` maps with an English value, HTTPS `sourceUrl`, required fields, length limits.
 - Resource update/delete, categories, alternatives: admins only.
 - Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
-- Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`.
+- Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`. Course progress may also store `completedVideoIds` (≤ 5,000 ids) and `lastVideoId`.
+- YouTube lessons: `resources/{resourceId}/videos/{lessonId}` is written only by the Admin SDK. Client reads follow the parent resource: published courses are public; drafts are limited to admins and the original submitter.
+- Course notes: `users/{uid}/courseNotes/{noteId}` is owner-only, capped at 4,000 characters per note.
 - Roadmaps: `users/{uid}/roadmaps` is owner-only read/delete; create is limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps); updates are denied. The top-level `roadmaps` collection is legacy and no longer written.
 - Reviews: verified email required, one per resource, owner-only edits.
 - `settings/site`: public read so every visitor can see the banner and maintenance switch; all writes are server-only.
 - Other `settings/*` (including `settings/ai`): completely denied to clients (the server's Admin SDK writes them).
 - `auditLogs/*`: completely denied to clients; only admins can read them through `GET /api/admin/audit-logs`.
-- Storage: images under 2 MB for community thumbnails (`thumbnails/{uid}/…`) and images under 1 MB (WebP/JPEG/PNG) for admin resource thumbnails (`thumbnails/admin/{uid}/…`, admin claim only).
+- Storage: legacy only. Existing thumbnail objects stay publicly readable, but all client writes are denied. New thumbnails are uploaded to Cloudinary.
 - Default deny for everything else.
 
 ## API
@@ -734,12 +758,14 @@ Admin access comes **only** from the `admin: true` custom claim (set with `scrip
 - **Resources CRUD:** all writes go through `/api/admin/resources` (never direct Firestore writes from the panel), so one server-side zod schema, the unique-slug generator, the piracy blocklist (`server/config/blocklist.js`) and the audit log apply to every save. Software listings must have a licence and an official `sourceUrl`; known piracy domains, crack keywords and third-party software mirrors are rejected with a `422` explaining the match.
 - **List search:** Firestore cannot substring-search three language fields, so the list endpoint applies equality filters in Firestore and search/language/sort in memory over the 500 most recently updated matches. The opaque cursor is an offset into that filtered set; the UI warns when the scan cap is reached.
 - **Test link:** `POST /api/admin/resources/test-link` performs an SSRF-safe reachability check (public http/https only, DNS + every redirect validated, 7 s timeout) and reports the final status.
+- **YouTube import:** `POST /api/admin/resources/youtube/preview` loads a public playlist and every video through the server-only YouTube Data API key. Saving the resource writes lesson metadata to `resources/{id}/videos/{lessonId}`; no video bytes are downloaded or rehosted. Updating an unrelated field preserves the lesson list, while changing or removing the playlist reconciles it.
+- **On-site courses:** `/course/:id` renders the ordered lesson list, one video at a time through the official YouTube IFrame Player API, per-lesson completion, private notes and practice prompts. Older courses without imported lessons fall back to YouTube's playlist embed until an admin imports the playlist.
 - **Categories & alternatives:** both collections are **server-write-only** (rules deny every client write), so ordering, slug uniqueness and the icon whitelist cannot be bypassed. Deleting a category that still has resources returns `409 category_in_use`; the UI offers a "move resources, then delete" flow instead. Resources store the English category **name**, so renaming a category moves its resources in the same request.
 - **Users:** the list merges Firebase Auth (identity, providers, disabled flag, metadata, claims) with `users/{uid}` (profile fields). Privileges are claim-only. The API refuses to remove your own admin claim, refuses to demote/delete the last administrator, and deletion requires typing the account email. Deletion removes the Auth user, profile, bookmarks and progress, while reviews are kept and anonymised so ratings stay honest.
 - **Reviews:** hide/show/delete runs in a Firestore transaction that re-queries the resource's reviews and rewrites `ratingAvg`/`ratingCount`, so cards and filters stay in sync. Hidden reviews are excluded by the security rules; the public review query filters `hidden == false` (composite index in `firebase/firestore.indexes.json`). Authors cannot change the `hidden` flag themselves.
 - **Reports queue:** a bounded scan (500 reports) supports reason groups (`illegal` = copyright/piracy, `broken`, `other`), status, resource and free-text filters. Copyright/piracy reports always sort first and are highlighted. The drawer saves the note and status in one PATCH; unpublishing flags the resource and resolves the report transactionally. Every write is audited and dispatches a shell-counter refresh, so the sidebar and bell badges update immediately.
 - **Link checker:** `POST /api/admin/check-links` starts an in-memory job (one at a time), checks with HEAD → GET fallback, a 10-second budget, at most 5 redirects, concurrency 5 and the same SSRF rules as the resource form. Results are written to `resources/{id}.linkCheck` (`ok`, `statusCode`, `finalUrl`, `checkedAt`, `error`, redirect metadata). A full check also stores `settings/linkChecker.lastFullCheckAt`; the client polls job progress, then reloads the saved rows. Broken/timed-out rows can be selected and bulk-flagged through the existing resource bulk endpoint.
-- **Thumbnails:** the browser resizes to 800 px, re-encodes as WebP and keeps the file under 1 MB before uploading to `thumbnails/admin/{uid}/…`; storage rules allow only admin-claimed accounts to write there.
+- **Thumbnails:** the browser resizes to 800 px, re-encodes as WebP and keeps the file under 1 MB before uploading to Cloudinary with the public unsigned preset. Only the resulting `secure_url` is stored in Firestore; the Cloudinary API secret never reaches the client.
 - **Note:** resource `viewCount` / `saveCount` are stored and sorted, but nothing increments them yet, so the "most viewed" and "most saved" lists show zeros on a freshly seeded library.
 
 ## Translations and RTL
@@ -820,7 +846,8 @@ This is an engineering checklist, not legal advice. Have a qualified lawyer revi
 - [ ] Review `CopyrightPage`, `TermsPage`, and `PrivacyPage` with counsel; fill in jurisdiction, entity name, and response times.
 - [ ] Confirm every book entry is public domain, openly licensed, or author-approved free.
 - [ ] Confirm every software entry links to the official publisher page and states the licence.
-- [ ] Confirm no files are hosted on Firebase Storage except optional thumbnails.
+- [ ] Confirm no YouTube video files are downloaded or rehosted; courses must use the official IFrame player and store only metadata/links.
+- [ ] Confirm thumbnails are hosted on Cloudinary and that only the public cloud name and unsigned preset are present in client configuration.
 - [ ] Keep a takedown log: date received, resource, action, and response.
 - [ ] Publish a named DMCA/agent contact and a realistic response window.
 - [ ] Add analytics/cookies disclosure if you introduce analytics later.

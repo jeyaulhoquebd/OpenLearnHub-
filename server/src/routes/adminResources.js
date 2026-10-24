@@ -6,6 +6,8 @@ import { apiError } from '../lib/http.js';
 import { writeAuditLogForRequest } from '../lib/audit.js';
 import { findBlockedSource } from '../../config/blocklist.js';
 import { checkUrl } from '../lib/linkCheck.js';
+import { deleteCourseVideos, syncCourseVideos } from '../lib/courseVideos.js';
+import { fetchPlaylistCourse } from '../lib/youtube.js';
 import {
   LIST_SORTS,
   RESOURCE_LANGUAGES,
@@ -16,6 +18,7 @@ import {
   decodeCursor,
   encodeCursor,
   matchesSearch,
+  normalizeCourseVideos,
   normalizeResourceInput,
   resourceInputSchema,
   serializeResource,
@@ -60,6 +63,33 @@ const bulkSchema = z.object({
 const testLinkSchema = z.object({
   url: z.string().trim().min(4).max(600)
 });
+
+const youtubePreviewSchema = z.object({
+  url: z.string().trim().min(4).max(600)
+});
+
+const YOUTUBE_ERROR_RESPONSES = {
+  youtube_not_configured: [503, 'YouTube is not configured on the server.'],
+  youtube_invalid_playlist: [400, 'Enter a valid public YouTube playlist URL or playlist ID.'],
+  youtube_playlist_not_found: [404, 'That playlist could not be found. Make sure it is public.'],
+  youtube_quota_exceeded: [429, 'The YouTube API quota has been reached. Try again later.'],
+  youtube_key_invalid: [502, 'The server YouTube API key was rejected. Check YOUTUBE_API_KEY.'],
+  youtube_forbidden: [403, 'YouTube refused access to this playlist.'],
+  youtube_timeout: [504, 'YouTube did not respond in time. Please try again.'],
+  youtube_unreachable: [502, 'The YouTube API could not be reached.'],
+  youtube_invalid_request: [400, 'YouTube rejected that playlist request.'],
+  youtube_api_error: [502, 'YouTube could not load that playlist right now.']
+};
+
+function youtubeErrorResponse(res, error) {
+  const mapped = YOUTUBE_ERROR_RESPONSES[error?.code];
+  return apiError(
+    res,
+    mapped?.[0] || 502,
+    error?.code || 'youtube_error',
+    mapped?.[1] || error?.message || 'YouTube could not load that playlist right now.'
+  );
+}
 
 const BULK_STATUS = {
   publish: 'published',
@@ -187,6 +217,28 @@ adminResourcesRouter.post('/test-link', async (req, res, next) => {
 });
 
 /**
+ * POST /api/admin/resources/youtube/preview
+ * Reads a public playlist (and every video in it) through the server-side
+ * YouTube Data API key. Returns metadata for the admin preview; videos are
+ * only persisted when the resource is saved.
+ */
+adminResourcesRouter.post('/youtube/preview', async (req, res, next) => {
+  try {
+    const parsed = parseBody(res, youtubePreviewSchema, req.body);
+    if (!parsed) return undefined;
+
+    try {
+      const result = await fetchPlaylistCourse(parsed.url);
+      return res.json(result);
+    } catch (error) {
+      return youtubeErrorResponse(res, error);
+    }
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
  * POST /api/admin/resources/bulk
  * Publish / unpublish / flag / delete up to 100 resources in one batch.
  */
@@ -225,6 +277,10 @@ adminResourcesRouter.post('/bulk', async (req, res, next) => {
 
     await batch.commit();
 
+    if (parsed.action === 'delete') {
+      await Promise.all(existing.map((snapshot) => deleteCourseVideos(db, snapshot.id)));
+    }
+
     await auditResource(req, 'resource.bulk', null, {
       bulkAction: parsed.action,
       requested: ids.length,
@@ -260,6 +316,8 @@ adminResourcesRouter.post('/', async (req, res, next) => {
     const hit = findBlockedSource(payload);
     if (blockedResponse(res, hit)) return undefined;
 
+    const videos =
+      parsed.youtubeVideos !== undefined ? normalizeCourseVideos(parsed.youtubeVideos) : [];
     const slug = await uniqueResourceSlug(db, buildResourceSlug(payload.title.en));
     const ref = db.collection('resources').doc();
     const now = FieldValue.serverTimestamp();
@@ -272,6 +330,8 @@ adminResourcesRouter.post('/', async (req, res, next) => {
       saveCount: 0,
       ratingAvg: 0,
       ratingCount: 0,
+      youtubeVideoCount: videos.length,
+      youtubeImportedAt: videos.length ? new Date().toISOString() : null,
       createdBy: req.user.uid,
       creatorEmail: req.user.email || null,
       createdAt: now,
@@ -280,14 +340,19 @@ adminResourcesRouter.post('/', async (req, res, next) => {
       lastVerified: new Date().toISOString()
     });
 
+    if (videos.length) {
+      await syncCourseVideos(db, ref.id, videos);
+    }
+
     await auditResource(req, 'resource.create', ref.id, {
       title: payload.title.en,
       type: payload.type,
       status: payload.status,
-      slug
+      slug,
+      youtubeVideoCount: videos.length
     });
 
-    return res.status(201).json({ id: ref.id, slug });
+    return res.status(201).json({ id: ref.id, slug, youtubeVideoCount: videos.length });
   } catch (error) {
     return next(error);
   }
@@ -323,6 +388,16 @@ adminResourcesRouter.put('/:id', async (req, res, next) => {
     const hit = findBlockedSource(payload);
     if (blockedResponse(res, hit)) return undefined;
 
+    const playlistChanged =
+      (payload.youtubePlaylistId || null) !== (existing.youtubePlaylistId || null);
+    let videos = parsed.youtubeVideos !== undefined
+      ? normalizeCourseVideos(parsed.youtubeVideos)
+      : null;
+
+    // Removing or replacing a playlist without sending a new lesson list must
+    // not leave the old lessons attached to the resource.
+    if (!videos && playlistChanged) videos = [];
+
     const titleChanged = payload.title.en !== existing.title?.en;
     const slug = titleChanged
       ? await uniqueResourceSlug(db, buildResourceSlug(payload.title.en), id)
@@ -335,6 +410,11 @@ adminResourcesRouter.put('/:id', async (req, res, next) => {
       updatedBy: req.user.uid
     };
 
+    if (videos) {
+      update.youtubeVideoCount = videos.length;
+      update.youtubeImportedAt = videos.length ? new Date().toISOString() : null;
+    }
+
     // Stamp the first publication date, but leave it alone afterwards.
     if (payload.status === 'published' && !existing.publishedAt) {
       update.publishedAt = FieldValue.serverTimestamp();
@@ -342,12 +422,17 @@ adminResourcesRouter.put('/:id', async (req, res, next) => {
 
     await ref.update(update);
 
+    if (videos) {
+      await syncCourseVideos(db, id, videos);
+    }
+
     await auditResource(req, 'resource.update', id, {
       title: payload.title.en,
       type: payload.type,
       status: payload.status,
       slug,
       titleChanged,
+      youtubeVideoCount: videos ? videos.length : existing.youtubeVideoCount || 0,
       before: {
         title: existing.title?.en || '',
         type: existing.type || '',
@@ -366,7 +451,7 @@ adminResourcesRouter.put('/:id', async (req, res, next) => {
       }
     });
 
-    return res.json({ id, slug });
+    return res.json({ id, slug, youtubeVideoCount: update.youtubeVideoCount });
   } catch (error) {
     return next(error);
   }
@@ -393,6 +478,7 @@ adminResourcesRouter.delete('/:id', async (req, res, next) => {
     }
 
     const data = snapshot.data() || {};
+    await deleteCourseVideos(db, id);
     await ref.delete();
 
     await auditResource(req, 'resource.delete', id, {

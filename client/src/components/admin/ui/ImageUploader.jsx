@@ -8,8 +8,8 @@ const DEFAULT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
  * Thumbnail picker with drag-and-drop and a live preview.
  *
  * Uploading is intentionally not handled here: the component validates the
- * file and hands it to the caller (`onFile`), which is where the Firebase
- * Storage upload lives. `value` is the currently saved preview URL.
+ * file and hands it to the caller (`onFile`), which is where the Cloudinary
+ * upload lives. `value` is the currently saved preview URL.
  */
 export default function ImageUploader({
   value = '',

@@ -79,6 +79,11 @@ export function assertProductionConfig() {
   const warnings = [];
   const { firebase } = config;
 
+  const hasCredential =
+    firebase.serviceAccountJson ||
+    (firebase.projectId && firebase.clientEmail && firebase.privateKey) ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
   if (config.isProduction && !config.groq.apiKey && !config.settings.encryptionKey) {
     warnings.push(
       'Neither GROQ_API_KEY nor SETTINGS_ENCRYPTION_KEY is set — the AI assistant will return 503 until an administrator configures a key.'
@@ -91,11 +96,6 @@ export function assertProductionConfig() {
     );
   }
 
-  const hasCredential =
-    firebase.serviceAccountJson ||
-    (firebase.projectId && firebase.clientEmail && firebase.privateKey) ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
   if (!hasCredential) {
     warnings.push(
       'No Firebase credentials detected. Set FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, or GOOGLE_APPLICATION_CREDENTIALS.'
@@ -104,6 +104,11 @@ export function assertProductionConfig() {
 
   if (config.isProduction && config.clientOrigins.includes('*')) {
     warnings.push('CLIENT_ORIGIN must not be "*" in production.');
+  }
+
+  if (config.isProduction && warnings.length > 0) {
+    warnings.forEach((warning) => console.error(`[config] ${warning}`));
+    throw new Error('Production configuration is incomplete. Fix the missing environment variables before starting the server.');
   }
 
   warnings.forEach((warning) => console.warn(`[config] ${warning}`));

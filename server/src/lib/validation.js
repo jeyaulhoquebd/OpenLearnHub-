@@ -22,9 +22,23 @@ export function sanitizeEmail(value, max = 200) {
   return sanitizeText(value, { max }).toLowerCase();
 }
 
-/** Normalises a user-supplied URL for storage (no trailing whitespace). */
+/** Normalises a user-supplied URL for storage (no trailing whitespace).
+ * Only public HTTP(S) destinations are accepted to reduce phishing and unsafe
+ * payloads from being stored in the database.
+ */
 export function sanitizeUrl(value, max = 600) {
-  return sanitizeText(value, { max });
+  const text = sanitizeText(value, { max });
+  if (!text) return '';
+
+  try {
+    const parsed = new URL(text);
+    const protocol = parsed.protocol.toLowerCase();
+    if (!['http:', 'https:'].includes(protocol)) return '';
+    if (!parsed.hostname) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
 }
 
 /** True when the verified-email requirement applies and the user fails it. */

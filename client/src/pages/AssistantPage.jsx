@@ -17,8 +17,8 @@ export default function AssistantPage() {
   ];
 
   const tabs = [
-    { key: 'chat', label: t('assistant.tabChat'), icon: MessageSquare },
-    { key: 'roadmap', label: t('assistant.tabRoadmap'), icon: Route }
+    { key: 'chat', label: t('assistant.tabChat'), hint: t('assistant.tabChatHint'), icon: MessageSquare },
+    { key: 'roadmap', label: t('assistant.tabRoadmap'), hint: t('assistant.tabRoadmapHint'), icon: Route }
   ];
 
   return (
@@ -63,7 +63,7 @@ export default function AssistantPage() {
             <div className="rounded-3xl border border-sand-200 bg-surface p-5 shadow-sm">
               <p className="flex items-center gap-2 text-sm font-bold text-ink">
                 <ShieldCheck className="h-4 w-4 text-brand-700" />
-                {t('home.legalEyebrow')}
+                {t('assistant.scope')}
               </p>
               <ul className="mt-3 space-y-2 text-xs leading-relaxed text-ink-soft">
                 <li className="flex items-start gap-2">
@@ -79,7 +79,7 @@ export default function AssistantPage() {
           </aside>
 
           <div className="overflow-hidden rounded-3xl border border-sand-200 bg-surface shadow-float">
-            <div className="flex items-center gap-1 border-b border-sand-200 bg-sand-50 px-2 pt-2" role="tablist">
+            <div className="grid grid-cols-2 gap-2 border-b border-sand-200 bg-sand-50/80 p-3 sm:gap-3 sm:p-4" role="tablist">
               {tabs.map((item) => {
                 const Icon = item.icon;
                 const active = tab === item.key;
@@ -88,20 +88,47 @@ export default function AssistantPage() {
                     key={item.key}
                     type="button"
                     role="tab"
+                    id={`assistant-tab-${item.key}`}
+                    aria-controls={`assistant-panel-${item.key}`}
                     aria-selected={active}
                     onClick={() => setTab(item.key)}
-                    className={`relative flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-sm font-semibold transition ${
-                      active ? 'text-brand-800' : 'text-ink-muted hover:text-ink'
+                    className={`flex min-h-[4.5rem] items-center gap-2.5 rounded-2xl border p-3 text-start transition sm:gap-3 sm:p-4 ${
+                      active
+                        ? 'border-brand-300 bg-surface text-brand-900 shadow-soft ring-2 ring-brand-500/10'
+                        : 'border-transparent bg-transparent text-ink-muted hover:border-sand-200 hover:bg-surface hover:text-ink'
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                    {active && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-navy-700" />}
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+                      active ? 'bg-navy-900 text-white' : 'bg-sand-200/70 text-ink-muted'
+                    }`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-bold sm:text-sm">{item.label}</span>
+                      <span className="mt-0.5 hidden text-[10px] leading-relaxed text-ink-muted sm:block">
+                        {item.hint}
+                      </span>
+                    </span>
                   </button>
                 );
               })}
             </div>
-            {tab === 'chat' ? <ChatPanel variant="page" /> : <RoadmapBuilder />}
+            <div
+              id="assistant-panel-chat"
+              role="tabpanel"
+              aria-labelledby="assistant-tab-chat"
+              hidden={tab !== 'chat'}
+            >
+              <ChatPanel variant="page" />
+            </div>
+            <div
+              id="assistant-panel-roadmap"
+              role="tabpanel"
+              aria-labelledby="assistant-tab-roadmap"
+              hidden={tab !== 'roadmap'}
+            >
+              <RoadmapBuilder />
+            </div>
           </div>
         </div>
       </section>

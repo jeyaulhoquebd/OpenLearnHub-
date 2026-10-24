@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowUpRight,
+  ArrowRight,
   Bot,
+  Compass,
   ExternalLink,
   Loader2,
   LogIn,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { askLearnMate } from '../lib/api';
+import { isPublicSitePath } from '../lib/publicSiteRoutes';
 import RichText from './RichText';
 
 const SUGGESTIONS = ['assistant.suggestion1', 'assistant.suggestion2', 'assistant.suggestion3'];
@@ -57,7 +59,8 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
         {
           role: 'assistant',
           content: response?.reply || '',
-          sources: Array.isArray(response?.sources) ? response.sources : []
+          sources: Array.isArray(response?.sources) ? response.sources : [],
+          sitePages: Array.isArray(response?.sitePages) ? response.sitePages : []
         }
       ]);
     } catch (requestError) {
@@ -216,6 +219,34 @@ export default function ChatPanel({ variant = 'widget', onClose }) {
                           <span className="line-clamp-2">{source.title}</span>
                         </a>
                       ))}
+                    </div>
+                  )}
+                  {message.sitePages?.some((page) => isPublicSitePath(page.path)) && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                        {t('assistant.sitePages')}
+                      </p>
+                      {message.sitePages
+                        .filter((page) => isPublicSitePath(page.path))
+                        .map((page) => (
+                          <Link
+                            key={page.path}
+                            to={page.path}
+                            onClick={onClose}
+                            className="group flex items-start gap-3 rounded-2xl border border-brand-200/80 bg-gradient-to-br from-brand-50/90 to-surface px-3.5 py-3 text-start transition hover:border-brand-400 hover:shadow-soft dark:from-brand-900/20"
+                          >
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-800 dark:bg-brand-800/50 dark:text-brand-100">
+                              <Compass className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-bold text-ink">{page.title}</span>
+                              <span className="mt-1 block text-[11px] leading-relaxed text-ink-muted">
+                                {page.description}
+                              </span>
+                            </span>
+                            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-brand-700 transition group-hover:translate-x-0.5 rtl:rotate-180" />
+                          </Link>
+                        ))}
                     </div>
                   )}
                 </div>

@@ -38,7 +38,7 @@ import { useResources } from '../hooks/useResources';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { fetchResourceById, getRelatedResources } from '../lib/data';
+import { fetchCourseVideos, fetchResourceById, getRelatedResources } from '../lib/data';
 import { COUNTRY_FLAGS, TYPE_META } from '../lib/constants';
 import { formatDate, formatNumber, localized } from '../lib/utils';
 
@@ -51,6 +51,7 @@ export default function ResourceDetailPage() {
   const [resource, setResource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
+  const [courseVideos, setCourseVideos] = useState([]);
 
   const localizedTitle = localized(resource?.title, i18n.language);
   const localizedDescription = localized(resource?.description, i18n.language);
@@ -79,6 +80,22 @@ export default function ResourceDetailPage() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!resource?.youtubePlaylistId) {
+      setCourseVideos([]);
+      return undefined;
+    }
+    let active = true;
+    fetchCourseVideos(resource.id)
+      .then((items) => {
+        if (active) setCourseVideos(items);
+      })
+      .catch((error) => console.warn('[resource] course videos', error));
+    return () => {
+      active = false;
+    };
+  }, [resource?.id, resource?.youtubePlaylistId]);
 
   const related = useMemo(() => getRelatedResources(resources, resource, 3), [resources, resource]);
 
@@ -284,7 +301,30 @@ export default function ResourceDetailPage() {
       <section className="container-page py-10 sm:py-14">
         <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
           <div className="min-w-0">
-            {isYouTubeCourse && <CoursePlayer resource={resource} className="mb-5" />}
+            {isYouTubeCourse && (
+              <div className="mb-5">
+                <CoursePlayer resource={resource} videos={courseVideos} />
+                {courseVideos.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-brand-950">
+                        {t('youtubeCourse.focusedCourseTitle')}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-brand-900/75">
+                        {t('youtubeCourse.focusedCourseText')}
+                      </p>
+                    </div>
+                    <Link
+                      to={`/course/${resource.id}`}
+                      className="btn-primary btn-sm shrink-0 justify-center"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {t('youtubeCourse.openFocusedCourse')}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="card p-6 sm:p-8">
               <h2 className="font-display text-2xl font-semibold text-ink">{t('resource.aboutTitle')}</h2>

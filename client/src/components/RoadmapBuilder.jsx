@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   BookmarkPlus,
+  Check,
   ExternalLink,
   GraduationCap,
   Library,
@@ -39,6 +40,7 @@ export default function RoadmapBuilder() {
   const { push } = useToast();
 
   const currentLanguage = OUTPUT_LANGUAGES.includes(i18n.language) ? i18n.language : 'en';
+  const goalExamples = ['roadmap.example1', 'roadmap.example2', 'roadmap.example3'];
 
   const [goal, setGoal] = useState('');
   const [level, setLevel] = useState('beginner');
@@ -169,87 +171,145 @@ export default function RoadmapBuilder() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-sand-200 bg-gradient-to-r from-accent-700 to-navy-800 px-4 py-3.5 text-white">
-        <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/15 ring-1 ring-inset ring-white/25">
-            <Route className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-bold leading-none">{t('roadmap.title')}</p>
-            <p className="mt-1 text-[11px] font-medium text-white/70">{t('roadmap.subtitle')}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-h-[42rem] flex-1 space-y-5 overflow-y-auto bg-sand-50/60 p-4">
+    <div className="space-y-5 bg-sand-50/60 p-4 sm:p-5">
         {!isVerified && (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-            <MailCheck className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>{t('report.verifyRequiredText')}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            <p className="flex min-w-0 flex-1 items-start gap-2.5">
+              <MailCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{t('roadmap.verifyText')}</span>
+            </p>
+            <Link to="/dashboard" className="shrink-0 font-bold underline underline-offset-2">
+              {t('roadmap.verifyAction')}
+            </Link>
           </div>
         )}
 
-        <form onSubmit={handleGenerate} className="rounded-2xl border border-sand-200 bg-surface p-4">
-          <label htmlFor="roadmap-goal" className="block text-sm font-semibold text-ink">
-            {t('roadmap.goalLabel')}
-          </label>
-          <textarea
-            id="roadmap-goal"
-            value={goal}
-            onChange={(event) => setGoal(event.target.value)}
-            rows={3}
-            maxLength={300}
-            placeholder={t('roadmap.goalPlaceholder')}
-            className="input mt-2 resize-none"
-          />
-          <p className="mt-1.5 text-[11px] text-ink-muted">{t('roadmap.goalHint')}</p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="roadmap-level" className="block text-xs font-semibold text-ink-soft">
-                {t('roadmap.levelLabel')}
-              </label>
-              <select
-                id="roadmap-level"
-                value={level}
-                onChange={(event) => setLevel(event.target.value)}
-                className="input mt-1.5"
-              >
-                {LEVELS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {t(option.labelKey)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="roadmap-language" className="block text-xs font-semibold text-ink-soft">
-                {t('roadmap.languageLabel')}
-              </label>
-              <select
-                id="roadmap-language"
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-                className="input mt-1.5"
-              >
-                {SUPPORTED_LANGUAGES.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+        <form
+          onSubmit={handleGenerate}
+          className="overflow-hidden rounded-3xl border border-brand-200/80 bg-surface shadow-sm"
+        >
+          <div className="relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-800 to-brand-800 px-5 py-5 text-white sm:px-6">
+            <div className="pointer-events-none absolute -end-10 -top-16 h-44 w-44 rounded-full bg-brand-300/15 blur-2xl" />
+            <div className="relative flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/20">
+                <Sparkles className="h-5 w-5 text-amber-200" />
+              </span>
+              <div>
+                <h3 className="font-display text-lg font-semibold">{t('roadmap.introTitle')}</h3>
+                <p className="mt-1 max-w-md text-xs leading-relaxed text-white/75">
+                  {t('roadmap.introText')}
+                </p>
+              </div>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={generating || goal.trim().length < 4 || !isVerified}
-            className="btn-primary mt-4 w-full justify-center"
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-            {generating ? t('roadmap.generating') : t('roadmap.generate')}
-          </button>
+          <div className="space-y-5 p-4 sm:p-6">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="roadmap-goal" className="text-sm font-bold text-ink">
+                  {t('roadmap.goalLabel')}
+                </label>
+                <span className="text-[11px] tabular-nums text-ink-muted" aria-live="polite">
+                  {t('roadmap.characters', { count: goal.length })}
+                </span>
+              </div>
+              <textarea
+                id="roadmap-goal"
+                value={goal}
+                onChange={(event) => setGoal(event.target.value)}
+                rows={3}
+                maxLength={300}
+                placeholder={t('roadmap.goalPlaceholder')}
+                className="input mt-2 min-h-28 resize-y rounded-2xl border-sand-300 bg-sand-50/50 px-4 py-3 focus:border-brand-400 focus:bg-surface"
+              />
+              <p className="mt-2 text-xs leading-relaxed text-ink-muted">{t('roadmap.goalHint')}</p>
+              <div className="mt-3">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                  {t('roadmap.examplesLabel')}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {goalExamples.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setGoal(t(key));
+                        setError('');
+                      }}
+                      className="rounded-full border border-sand-300 bg-surface px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900"
+                    >
+                      {t(key)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <fieldset>
+              <legend className="mb-2.5 text-sm font-bold text-ink">{t('roadmap.levelLabel')}</legend>
+              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t('roadmap.levelLabel')}>
+                {LEVELS.map((option, index) => {
+                  const selected = level === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setLevel(option.value)}
+                      className={`relative flex min-h-[5.25rem] items-start gap-2.5 rounded-2xl border p-3 text-start transition ${
+                        selected
+                          ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/15 dark:bg-brand-900/20'
+                          : 'border-sand-200 bg-surface hover:border-brand-300 hover:bg-sand-50'
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+                          selected ? 'border-brand-700 bg-brand-700 text-white' : 'border-sand-400'
+                        }`}
+                      >
+                        {selected && <Check className="h-2.5 w-2.5" />}
+                      </span>
+                      <span>
+                        <span className="block text-xs font-bold text-ink">{t(option.labelKey)}</span>
+                        <span className="mt-1 block text-[10px] leading-relaxed text-ink-muted">
+                          {t(`roadmap.level${['Beginner', 'Intermediate', 'Advanced'][index]}Hint`)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div>
+                <label htmlFor="roadmap-language" className="block text-xs font-bold text-ink">
+                  {t('roadmap.languageLabel')}
+                </label>
+                <select
+                  id="roadmap-language"
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                  className="input mt-1.5 rounded-xl"
+                >
+                  {SUPPORTED_LANGUAGES.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={generating || goal.trim().length < 4 || !isVerified}
+                className="btn-primary min-h-11 justify-center rounded-xl px-5 shadow-soft sm:min-w-52"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {generating ? t('roadmap.generating') : t('roadmap.generate')}
+              </button>
+            </div>
+          </div>
         </form>
 
         {generating && (
@@ -289,16 +349,29 @@ export default function RoadmapBuilder() {
         )}
 
         {roadmap && !generating && (
-          <article className="rounded-2xl border border-brand-200 bg-surface p-4 shadow-sm">
-            <div className="flex items-start gap-2 text-brand-800">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <h3 className="font-display text-lg font-semibold text-ink">{roadmap.title}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-ink-soft">{roadmap.summary}</p>
+          <article className="overflow-hidden rounded-3xl border border-brand-200 bg-surface shadow-soft">
+            <div className="bg-gradient-to-r from-brand-50 via-surface to-amber-50/70 p-5 sm:p-6 dark:from-brand-900/20 dark:to-amber-900/10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold text-brand-900 dark:bg-brand-800/50 dark:text-brand-100">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t('roadmap.planSteps', { count: roadmap.steps.length })}
+                </span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                  {t(LEVELS.find((item) => item.value === roadmap.level)?.labelKey || 'roadmap.levelBeginner')}
+                </span>
+              </div>
+              <div className="mt-3 flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-navy-900 text-white shadow-sm">
+                  <Route className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-display text-xl font-bold text-ink">{roadmap.title}</h3>
+                  <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-soft">{roadmap.summary}</p>
+                </div>
               </div>
             </div>
 
-            <ol className="relative mt-5 space-y-4 before:absolute before:bottom-3 before:start-[0.95rem] before:top-3 before:w-px before:bg-sand-200">
+            <ol className="relative space-y-3 px-4 py-5 sm:px-6 before:absolute before:bottom-8 before:start-[2.45rem] before:top-8 before:w-px before:bg-gradient-to-b before:from-brand-300 before:to-sand-200 sm:before:start-[2.95rem]">
               {roadmap.steps.map((step, index) => {
                 const stepResources =
                   step.resources?.length > 0
@@ -308,18 +381,25 @@ export default function RoadmapBuilder() {
                         .filter(Boolean);
 
                 return (
-                  <li key={`${step.order || index}-${step.title}`} className="relative ps-11">
-                    <span className="absolute start-0 top-0 grid h-8 w-8 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white shadow-soft">
-                      {step.order || index + 1}
+                  <li key={`${step.order || index}-${step.title}`} className="relative ps-11 sm:ps-14">
+                    <span className="absolute start-0 top-1 grid h-8 w-8 place-items-center rounded-full border-4 border-surface bg-navy-800 text-[10px] font-bold text-white shadow-soft sm:h-9 sm:w-9">
+                      {String(step.order || index + 1).padStart(2, '0')}
                     </span>
-                    <div className="rounded-2xl border border-sand-200 bg-sand-50/60 p-3.5">
-                      <h4 className="font-semibold text-ink">{step.title}</h4>
+                    <div className="rounded-2xl border border-sand-200 bg-surface p-4 transition hover:border-brand-200 hover:shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-700">
+                        {t('roadmap.stepLabel', { number: step.order || index + 1 })}
+                      </p>
+                      <h4 className="mt-1 font-display text-base font-semibold text-ink">{step.title}</h4>
                       <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
                         {step.explanation || step.description}
                       </p>
 
                       {stepResources.length > 0 && (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-4">
+                          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                            {t('roadmap.resourcesForStep')}
+                          </p>
+                          <div className="grid gap-2 sm:grid-cols-2">
                           {stepResources.map((resource) => (
                             <a
                               key={resource.id}
@@ -348,6 +428,7 @@ export default function RoadmapBuilder() {
                               </span>
                             </a>
                           ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -356,7 +437,7 @@ export default function RoadmapBuilder() {
               })}
             </ol>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 border-t border-sand-200 px-4 py-4 sm:px-6">
               <button
                 type="button"
                 onClick={handleSave}
@@ -414,7 +495,6 @@ export default function RoadmapBuilder() {
             <p className="mt-2 text-xs leading-relaxed text-ink-muted">{t('roadmap.savedEmpty')}</p>
           )}
         </section>
-      </div>
     </div>
   );
 }

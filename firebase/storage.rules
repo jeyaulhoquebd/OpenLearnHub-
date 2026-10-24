@@ -1,46 +1,18 @@
 rules_version = '2';
 
-// OpenLearn Hub uses Cloud Storage for ONE purpose only: small cover images
-// (thumbnails) attached to community resource submissions. We never allow
-// executables, archives, or documents to be uploaded.
+// Legacy read-only storage.
+//
+// New thumbnails are uploaded to Cloudinary through the client-side unsigned
+// preset (see client/src/lib/cloudinary.js). The site no longer exposes a
+// Firebase Storage picker or upload path. Existing Firebase Storage images are
+// kept readable so old resource cards do not break; all new writes are denied.
 service firebase.storage {
   match /b/{bucket}/o {
-
-    function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
-    }
-
-    match /thumbnails/{userId}/{fileName} {
-      // Thumbnails are public so resource cards can render them.
+    match /thumbnails/{allPaths=**} {
       allow read: if true;
-
-      // A signed-in user may upload only into their own folder, only image
-      // files, and only up to 2 MB. Admins may upload anywhere.
-      allow create, update: if
-        request.auth != null &&
-        (request.auth.uid == userId || isAdmin()) &&
-        request.resource.size < 2 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
-
-      // Only the owner or an admin (Firebase Admin via the server) may delete.
-      allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if false;
     }
 
-    // Admin-managed resource thumbnails (the /admin/resources editor).
-    // The browser resizes to 800 px and re-encodes as WebP under 1 MB before
-    // uploading; the rules enforce the same limits server-side.
-    match /thumbnails/admin/{userId}/{fileName} {
-      allow read: if true;
-
-      allow create, update: if
-        isAdmin() &&
-        request.resource.size < 1024 * 1024 &&
-        request.resource.contentType.matches('image/(webp|jpeg|png)');
-
-      allow delete: if isAdmin();
-    }
-
-    // Everything else is denied.
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -74,6 +74,21 @@ service cloud.firestore {
           request.resource.data.thumbnailUrl is string);
 
       allow update, delete: if isAdmin();
+
+      // YouTube lessons are stored in a subcollection so long playlists do not
+      // hit Firestore's 1 MiB document limit. Only the Admin SDK (Express API)
+      // writes them. Readers inherit the parent resource's visibility: public
+      // for published courses, plus admins and the original submitter.
+      match /videos/{lessonId} {
+        allow read: if
+          isAdmin() ||
+          get(/databases/$(database)/documents/resources/$(resourceId)).data.status == 'published' ||
+          (
+            isSignedIn() &&
+            get(/databases/$(database)/documents/resources/$(resourceId)).data.createdBy == request.auth.uid
+          );
+        allow write: if false;
+      }
     }
 
     // ---------- categories & alternatives (server-managed) ----------
@@ -134,6 +149,21 @@ service cloud.firestore {
         allow update: if false;
       }
 
+      // Private course notes, one document per (course, lesson). The body is
+      // capped at 4,000 characters to keep documents small and cheap to sync.
+      match /courseNotes/{noteId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if
+          isOwner(userId) &&
+          request.resource.data.userId == userId &&
+          isNonEmptyString(request.resource.data.resourceId) &&
+          request.resource.data.resourceId.size() <= 140 &&
+          isNonEmptyString(request.resource.data.videoId) &&
+          request.resource.data.videoId.size() <= 64 &&
+          isNonEmptyString(request.resource.data.body) &&
+          request.resource.data.body.size() <= 4000;
+      }
+
       // Legacy personal saved resources. Private to the owner.
       match /bookmarks/{resourceId} {
         allow read, write: if isOwner(userId);
@@ -158,7 +188,14 @@ service cloud.firestore {
       allow create, update: if
         isSignedIn() &&
         request.resource.data.userId == request.auth.uid &&
-        progressId == ownedDocId(request.auth.uid, request.resource.data.resourceId);
+        progressId == ownedDocId(request.auth.uid, request.resource.data.resourceId) &&
+        (
+          !('completedVideoIds' in request.resource.data) ||
+          (
+            request.resource.data.completedVideoIds is list &&
+            request.resource.data.completedVideoIds.size() <= 5000
+          )
+        );
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 

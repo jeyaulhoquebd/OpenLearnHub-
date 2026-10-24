@@ -1,14 +1,12 @@
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from './firebase';
+import { uploadCloudinaryImage } from './cloudinary';
 import { safeFileName } from './utils';
 
 /**
- * Thumbnail pipeline for admin resource forms.
+ * Thumbnail pipeline.
  *
  * The browser always produces a WebP image no larger than 800 px on its longest
- * side and 1 MB on disk before it reaches Cloud Storage. That keeps public
- * pages fast on mobile data and matches the storage rules (admin uploads must
- * be images under 1 MB).
+ * side and 1 MB on disk before it reaches Cloudinary. That keeps public pages
+ * fast on mobile data and keeps the unsigned upload preset's limits predictable.
  */
 
 export const MAX_THUMBNAIL_DIMENSION = 800;
@@ -114,27 +112,14 @@ export async function prepareThumbnail(file) {
 }
 
 /**
- * Uploads an already-prepared thumbnail to `thumbnails/admin/{uid}/…`.
+ * Uploads an already-prepared thumbnail to Cloudinary and returns its URL.
  *
- * Admins upload to the reserved `admin/` prefix: storage rules only allow
- * admin-claimed accounts to write there, while community submissions keep
- * using their own `thumbnails/{uid}/…` folder.
+ * `uid` is optional and only used for a readable folder hint. The unsigned
+ * preset decides the final public id and delivery format.
  */
-export async function uploadThumbnail(file, uid) {
-  if (!storage) {
-    throw fail('storage_unavailable', 'Image uploads are unavailable in preview mode.');
-  }
-  if (!uid) {
-    throw fail('not_signed_in', 'Sign in again to upload an image.');
-  }
-
-  const path = `thumbnails/admin/${uid}/${Date.now()}-${safeFileName(file.name || 'thumbnail.webp')}`;
-  const storageRef = ref(storage, path);
-
-  await uploadBytes(storageRef, file, {
-    contentType: file.type || 'image/webp',
-    cacheControl: 'public,max-age=31536000,immutable'
-  });
-
-  return getDownloadURL(storageRef);
+export async function uploadThumbnail(file, uid = '') {
+  if (!file) throw fail('image_missing', 'Choose an image first.');
+  const folder = uid ? `openlearnhub/thumbnails/${String(uid).slice(0, 120)}` : '';
+  const result = await uploadCloudinaryImage(file, { folder });
+  return result.url;
 }

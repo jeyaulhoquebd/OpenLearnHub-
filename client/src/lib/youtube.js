@@ -5,6 +5,7 @@
  */
 
 export const YOUTUBE_PLAYLIST_ID_RE = /^[A-Za-z0-9_-]{10,64}$/;
+export const YOUTUBE_VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
 const YOUTUBE_HOSTS = new Set([
   'youtube.com',
@@ -40,9 +41,52 @@ export function youtubePlaylistUrl(playlistId) {
   return id ? `https://www.youtube.com/playlist?list=${encodeURIComponent(id)}` : '';
 }
 
+/** Accepts a raw id, watch URL, youtu.be URL, embed URL or Shorts URL. */
+export function parseYouTubeVideoId(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+  if (YOUTUBE_VIDEO_ID_RE.test(input)) return input;
+
+  try {
+    const url = new URL(input);
+    const host = url.hostname.toLowerCase();
+    if (!YOUTUBE_HOSTS.has(host)) return '';
+
+    if (host === 'youtu.be') {
+      const candidate = url.pathname.split('/').filter(Boolean)[0] || '';
+      return YOUTUBE_VIDEO_ID_RE.test(candidate) ? candidate : '';
+    }
+
+    const queryId = url.searchParams.get('v') || '';
+    if (YOUTUBE_VIDEO_ID_RE.test(queryId)) return queryId;
+
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (['embed', 'shorts', 'live', 'v'].includes(parts[0])) {
+      const candidate = parts[1] || '';
+      return YOUTUBE_VIDEO_ID_RE.test(candidate) ? candidate : '';
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+export function youtubeVideoUrl(videoId) {
+  const id = parseYouTubeVideoId(videoId);
+  return id ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}` : '';
+}
+
+/** Privacy-enhanced embed for one video. */
+export function youtubeVideoEmbedUrl(videoId) {
+  const id = parseYouTubeVideoId(videoId);
+  return id
+    ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&playsinline=1`
+    : '';
+}
+
 /**
- * Privacy-enhanced embed URL. `videoseries` plays the whole playlist and lets
- * the learner move between videos without leaving OpenLearn Hub.
+ * Privacy-enhanced playlist embed used as a fallback for courses imported
+ * before the per-video lesson list existed.
  */
 export function youtubeEmbedUrl(playlistId) {
   const id = parseYouTubePlaylistId(playlistId);

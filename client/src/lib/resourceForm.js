@@ -242,13 +242,17 @@ function compactMap(values) {
   return map;
 }
 
-/** Form values → the JSON body expected by the admin API. */
-export function toResourcePayload(values) {
+/**
+ * Form values → the JSON body expected by the admin API.
+ *
+ * `extra` carries the imported YouTube lesson metadata, which is not part of
+ * react-hook-form (it is fetched and previewed separately).
+ */
+export function toResourcePayload(values, extra = {}) {
   const youtubePlaylistId =
     parseYouTubePlaylistId(values.youtubePlaylistUrl) ||
     parseYouTubePlaylistId(values.sourceUrl);
-
-  return {
+  const payload = {
     type: values.type,
     category: values.category,
     level: values.level,
@@ -278,6 +282,21 @@ export function toResourcePayload(values) {
     status: values.status,
     featured: Boolean(values.featured)
   };
+
+  if (extra.youtubePlaylistTitle !== undefined) {
+    payload.youtubePlaylistTitle = extra.youtubePlaylistTitle || '';
+  }
+  if (extra.youtubeChannelTitle !== undefined) {
+    payload.youtubeChannelTitle = extra.youtubeChannelTitle || '';
+  }
+  if (extra.youtubeChannelId !== undefined) {
+    payload.youtubeChannelId = extra.youtubeChannelId || '';
+  }
+  if (extra.youtubeVideos !== undefined) {
+    payload.youtubeVideos = Array.isArray(extra.youtubeVideos) ? extra.youtubeVideos : [];
+  }
+
+  return payload;
 }
 
 export function languageCompleteness(values, code) {

@@ -10,14 +10,17 @@ import {
   BookOpen,
   CheckCircle2,
   ExternalLink,
+  DownloadCloud,
   FileText,
   Globe2,
   Image as ImageIcon,
   Info,
   Layers,
   Link2,
+  ListVideo,
   Loader2,
   PlayCircle,
+  RefreshCw,
   Rocket,
   Save,
   ShieldCheck,
@@ -31,8 +34,18 @@ import StatusBadge from '../../components/admin/ui/StatusBadge';
 import ConfirmDialog from '../../components/admin/ui/ConfirmDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { createAdminResource, testResourceLink, updateAdminResource } from '../../lib/api';
-import { categoryName, fetchCategories, fetchResourceById } from '../../lib/data';
+import {
+  createAdminResource,
+  previewYouTubePlaylist,
+  testResourceLink,
+  updateAdminResource
+} from '../../lib/api';
+import {
+  categoryName,
+  fetchCategories,
+  fetchCourseVideos,
+  fetchResourceById
+} from '../../lib/data';
 import { COUNTRIES, LANGUAGES, LEVELS, PLATFORMS, RESOURCE_TYPES } from '../../lib/constants';
 import {
   CONTENT_LANGUAGES,
@@ -46,7 +59,7 @@ import {
   toResourcePayload
 } from '../../lib/resourceForm';
 import { prepareThumbnail, uploadThumbnail } from '../../lib/thumbnails';
-import { parseYouTubePlaylistId, youtubeEmbedUrl, youtubePlaylistUrl } from '../../lib/youtube';
+import { parseYouTubePlaylistId, youtubePlaylistUrl } from '../../lib/youtube';
 import { formatDate } from '../../lib/utils';
 
 const TYPE_ICONS = {
@@ -62,6 +75,9 @@ const IMAGE_ERROR_KEYS = {
   image_decode_failed: 'decode',
   image_encode_failed: 'encode',
   storage_unavailable: 'storage',
+  cloudinary_unavailable: 'storage',
+  cloudinary_upload_failed: 'cloudinary',
+  cloudinary_network: 'cloudinary',
   not_signed_in: 'storage'
 };
 
@@ -124,8 +140,8 @@ function PreviewTypeChip({ type }) {
  *
  * Writes always go through the admin API so the same server-side schema,
  * piracy blocklist, unique slug generation and audit logging apply to every
- * save. Image bytes go straight to Cloud Storage (admin-only prefix), then the
- * download URL is saved with the resource.
+ * save. Thumbnail bytes go directly to Cloudinary through an unsigned upload
+ * preset; only the resulting delivery URL is saved with the resource.
  */
 export default function AdminResourceFormPage() {
   const { id } = useParams();
@@ -149,6 +165,17 @@ export default function AdminResourceFormPage() {
   const [linkState, setLinkState] = useState(null);
   const [cancelConfirm, setCancelConfirm] = useState(false);
 
+  // YouTube import state. `videosLoaded` distinguishes "this course has no
+  // lessons" from "we have not read the lesson list yet", so saving unrelated
+  // fields never clears an existing import by accident.
+  const [importedPlaylist, setImportedPlaylist] = useState(null);
+  const [courseVideos, setCourseVideos] = useState([]);
+  const [videosLoaded, setVideosLoaded] = useState(false);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [showAllVideos, setShowAllVideos] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -169,7 +196,6 @@ export default function AdminResourceFormPage() {
       parseYouTubePlaylistId(values.sourceUrl),
     [values.youtubePlaylistUrl, values.sourceUrl]
   );
-  const youtubeEmbed = youtubeEmbedUrl(youtubePlaylistId);
 
   // Auto-fill the source metadata once a valid playlist is detected. The
   // effect only depends on the id, so an admin can still edit the name,
@@ -231,7 +257,15 @@ export default function AdminResourceFormPage() {
   }, []);
 
   useEffect(() => {
+    setImportedPlaylist(null);
+    setCourseVideos([]);
+    setVideosLoaded(false);
+    setImportError('');
+    setShowAllVideos(false);
+
     if (!isEdit) {
+      setExisting(null);
+      setSlug('');
       setLoading(false);
       return undefined;
     }
@@ -263,6 +297,35 @@ export default function AdminResourceFormPage() {
       active = false;
     };
   }, [id, isEdit, reset]);
+
+  // Load the lessons already saved for this course. They are shown in the
+  // import panel and sent back on save, so editing the title or thumbnail does
+  // not delete an imported playlist.
+  useEffect(() => {
+    if (!isEdit || !existing?.id) return undefined;
+    let active = true;
+    setVideosLoading(true);
+    setImportError('');
+    fetchCourseVideos(existing.id)
+      .then((items) => {
+        if (!active) return;
+        setCourseVideos(items);
+        setVideosLoaded(true);
+      })
+      .catch((error) => {
+        console.warn('[admin-resource-form] existing lessons', error);
+        if (active) {
+          setImportError(error?.message || t('youtubeCourse.importLoadError'));
+          setVideosLoaded(false);
+        }
+      })
+      .finally(() => {
+        if (active) setVideosLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [existing?.id, isEdit, t]);
 
   const categoryOptions = useMemo(() => {
     const names = categories.map((item) => categoryName(item, 'en')).filter(Boolean);
@@ -340,13 +403,103 @@ export default function AdminResourceFormPage() {
     }
   }
 
+  async function handleImportPlaylist() {
+    const input = String(values.youtubePlaylistUrl || values.sourceUrl || '').trim();
+    const playlistId =
+      parseYouTubePlaylistId(values.youtubePlaylistUrl) ||
+      parseYouTubePlaylistId(values.sourceUrl);
+
+    if (!playlistId) {
+      setImportError(t('youtubeCourse.playlistInvalid'));
+      return;
+    }
+    if (!user) return;
+
+    setImporting(true);
+    setImportError('');
+    try {
+      const token = await user.getIdToken();
+      const result = await previewYouTubePlaylist(input || playlistId, token);
+      const playlist = result?.playlist || {};
+      const videos = Array.isArray(result?.videos) ? result.videos : [];
+
+      setImportedPlaylist(playlist);
+      setCourseVideos(videos);
+      setVideosLoaded(true);
+      setShowAllVideos(false);
+      setValue('youtubePlaylistUrl', youtubePlaylistUrl(playlist.id || playlistId), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+      setValue('sourceUrl', youtubePlaylistUrl(playlist.id || playlistId), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+      setValue('type', 'course', { shouldDirty: true, shouldValidate: true });
+
+      if (!String(values.sourceName || '').trim() && playlist.channelTitle) {
+        setValue('sourceName', playlist.channelTitle, {
+          shouldDirty: true,
+          shouldValidate: true
+        });
+      }
+      if (!String(values.author || '').trim() && playlist.channelTitle) {
+        setValue('author', playlist.channelTitle, { shouldDirty: true, shouldValidate: true });
+      }
+      if (!String(values.title_en || '').trim() && playlist.title) {
+        setValue('title_en', String(playlist.title).slice(0, 160), {
+          shouldDirty: true,
+          shouldValidate: true
+        });
+      }
+      if (
+        !String(values.description_en || '').trim() &&
+        typeof playlist.description === 'string' &&
+        playlist.description.trim().length >= 40
+      ) {
+        setValue('description_en', playlist.description.slice(0, 2000), {
+          shouldDirty: true,
+          shouldValidate: true
+        });
+      }
+      if (!String(values.thumbnailUrl || '').trim() && playlist.thumbnailUrl) {
+        setValue('thumbnailUrl', playlist.thumbnailUrl, {
+          shouldDirty: true,
+          shouldValidate: true
+        });
+      }
+
+      push(t('youtubeCourse.importSuccess', { count: videos.length }));
+    } catch (error) {
+      console.warn('[admin-resource-form] youtube import', error);
+      setImportError(error?.message || t('youtubeCourse.importError'));
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function onSubmit(formValues) {
     if (!user) return;
     setSaving(true);
 
     try {
       const token = await user.getIdToken();
-      const payload = toResourcePayload(formValues);
+      const loadedPlaylistId = importedPlaylist?.id || existing?.youtubePlaylistId || '';
+      const lessonsMatchPlaylist =
+        videosLoaded && Boolean(youtubePlaylistId) && loadedPlaylistId === youtubePlaylistId;
+      const payload = toResourcePayload(formValues, {
+        ...(lessonsMatchPlaylist
+          ? {
+              youtubeVideos: courseVideos,
+              youtubePlaylistTitle:
+                importedPlaylist?.title || existing?.youtubePlaylistTitle || '',
+              youtubeChannelTitle:
+                importedPlaylist?.channelTitle || existing?.youtubeChannelTitle || '',
+              youtubeChannelId:
+                importedPlaylist?.channelId || existing?.youtubeChannelId || ''
+            }
+          : {})
+      });
 
       if (isEdit) {
         await updateAdminResource(id, payload, token);
@@ -898,31 +1051,157 @@ export default function AdminResourceFormPage() {
             </FormField>
 
             {youtubePlaylistId ? (
-              <div className="space-y-3">
-                <p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleImportPlaylist}
+                  disabled={importing || uploading || videosLoading}
+                  className="btn-primary btn-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {importing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : courseVideos.length ? (
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <DownloadCloud className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {importing
+                    ? t('youtubeCourse.importing')
+                    : courseVideos.length
+                      ? t('youtubeCourse.refreshImport')
+                      : t('youtubeCourse.importPlaylist')}
+                </button>
+                <a
+                  href={youtubePlaylistUrl(youtubePlaylistId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary btn-sm"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  {t('youtubeCourse.openPlaylist')}
+                </a>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30">
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                   {t('youtubeCourse.playlistDetected', { id: youtubePlaylistId })}
-                </p>
-                <div className="overflow-hidden rounded-2xl border border-sand-200 bg-black">
-                  <div className="aspect-video w-full">
-                    <iframe
-                      src={youtubeEmbed}
-                      title={t('youtubeCourse.adminPreviewTitle')}
-                      className="h-full w-full"
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      referrerPolicy="strict-origin-when-cross-origin"
-                    />
-                  </div>
-                </div>
-                <p className="text-[11px] leading-relaxed text-ink-muted">
-                  {t('youtubeCourse.adminPreviewHint')}
-                </p>
+                </span>
               </div>
             ) : (
               <p className="rounded-xl bg-sand-50 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
                 {t('youtubeCourse.playlistEmpty')}
+              </p>
+            )}
+
+            {importError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{importError}</span>
+              </div>
+            )}
+
+            {videosLoading && (
+              <p className="inline-flex items-center gap-2 text-xs text-ink-muted">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                {t('youtubeCourse.loadingLessons')}
+              </p>
+            )}
+
+            {videosLoaded &&
+              youtubePlaylistId &&
+              (importedPlaylist?.id || existing?.youtubePlaylistId) &&
+              youtubePlaylistId !== (importedPlaylist?.id || existing?.youtubePlaylistId) && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <p>{t('youtubeCourse.playlistChangedWarning')}</p>
+                </div>
+              )}
+
+            {!videosLoading && courseVideos.length > 0 && (
+              <div className="overflow-hidden rounded-2xl border border-sand-200">
+                <div className="border-b border-sand-100 bg-sand-50/70 px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-bold text-ink">
+                        <ListVideo className="h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+                        {importedPlaylist?.title || existing?.youtubePlaylistTitle || t('youtubeCourse.importedLessons')}
+                      </p>
+                      <p className="mt-1 text-[11px] text-ink-muted">
+                        {importedPlaylist?.channelTitle ||
+                          existing?.youtubeChannelTitle ||
+                          t('youtubeCourse.adminSourceName')}
+                        {' · '}
+                        {t('youtubeCourse.videoCount', { count: courseVideos.length })}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+                      {t('youtubeCourse.importReady')}
+                    </span>
+                  </div>
+                </div>
+                <ol className="max-h-80 divide-y divide-sand-100 overflow-y-auto">
+                  {(showAllVideos ? courseVideos : courseVideos.slice(0, 12)).map(
+                    (video, index) => (
+                      <li
+                        key={video.id || video.videoId || index}
+                        className="flex items-start gap-2.5 px-4 py-2.5 text-xs"
+                      >
+                        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-sand-100 text-[10px] font-bold text-ink-muted">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 font-semibold leading-relaxed text-ink-soft">
+                            {video.title}
+                          </p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-ink-muted">
+                            <span>{video.durationText || '—'}</span>
+                            {video.available === false && (
+                              <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                {t('youtubeCourse.lessonUnavailableShort')}
+                              </span>
+                            )}
+                            {video.embeddable === false && (
+                              <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                {t('youtubeCourse.notEmbeddableShort')}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        {video.sourceUrl && (
+                          <a
+                            href={video.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-full p-1 text-ink-muted transition hover:bg-sand-100 hover:text-brand-700"
+                            aria-label={t('youtubeCourse.openLessonOnYouTube')}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                          </a>
+                        )}
+                      </li>
+                    )
+                  )}
+                </ol>
+                {courseVideos.length > 12 && (
+                  <div className="border-t border-sand-100 bg-sand-50/50 px-4 py-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllVideos((current) => !current)}
+                      className="text-[11px] font-semibold text-brand-700 hover:text-brand-900"
+                    >
+                      {showAllVideos
+                        ? t('youtubeCourse.showFewerLessons')
+                        : t('youtubeCourse.showAllLessons', { count: courseVideos.length })}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!videosLoading && videosLoaded && courseVideos.length === 0 && youtubePlaylistId && (
+              <p className="rounded-xl bg-sand-50 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+                {t('youtubeCourse.noLessonsImported')}
               </p>
             )}
 

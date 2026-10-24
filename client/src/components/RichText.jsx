@@ -1,13 +1,16 @@
 import { Fragment } from 'react';
+import { Link } from 'react-router-dom';
+import { isPublicSitePath } from '../lib/publicSiteRoutes';
 
 const TOKEN_RE = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|`[^`]+`)/g;
 
 function safeHref(value) {
+  if (isPublicSitePath(value)) return 'internal';
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return url.protocol === 'http:' || url.protocol === 'https:' ? 'external' : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -16,7 +19,7 @@ function safeHref(value) {
  * models commonly emit (**bold**, *italic*, `code`, and [links](url)).
  *
  * It intentionally does not use dangerouslySetInnerHTML: the model output is
- * untrusted text, and every link is restricted to http/https.
+ * untrusted text, and internal links are restricted to public routes.
  */
 export default function RichText({ text }) {
   const source = String(text || '');
@@ -42,7 +45,19 @@ export default function RichText({ text }) {
     }
 
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (link && safeHref(link[2])) {
+    const linkType = link ? safeHref(link[2]) : null;
+    if (link && linkType === 'internal') {
+      return (
+        <Link
+          key={index}
+          to={link[2]}
+          className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-900"
+        >
+          {link[1]}
+        </Link>
+      );
+    }
+    if (link && linkType === 'external') {
       return (
         <a
           key={index}

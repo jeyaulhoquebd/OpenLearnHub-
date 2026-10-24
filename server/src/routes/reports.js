@@ -12,7 +12,13 @@ const reportSchema = z.object({
   resourceId: z.string().trim().min(1).max(160),
   resourceTitle: z.string().trim().min(1).max(220),
   resourceType: z.enum(['course', 'book', 'software']).optional().default('course'),
-  resourceUrl: z.string().trim().max(600).optional().default(''),
+  resourceUrl: z
+    .string()
+    .trim()
+    .max(600)
+    .optional()
+    .transform((value) => sanitizeUrl(value || '', 600))
+    .default(''),
   reason: z.enum(['copyright', 'broken-link', 'piracy', 'inaccurate', 'spam', 'other']),
   details: z.string().trim().max(1500).optional().default(''),
   email: z.union([z.string().trim().email().max(200), z.literal('')]).optional().default(''),

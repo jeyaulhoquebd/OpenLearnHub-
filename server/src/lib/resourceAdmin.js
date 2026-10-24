@@ -87,7 +87,7 @@ export const courseVideoInputSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(2000).optional().default(''),
   thumbnailUrl: z.string().trim().max(800).optional().default(''),
-  durationSeconds: z.coerce.number().int().min(0).max(86400).optional().default(0),
+  durationSeconds: z.coerce.number().int().min(0).max(604800).optional().default(0),
   durationText: z.string().trim().max(20).optional().default(''),
   publishedAt: z.string().trim().max(40).optional().default(''),
   channelTitle: z.string().trim().max(160).optional().default(''),
@@ -245,6 +245,41 @@ export function normalizeResourceInput(input) {
   };
 }
 
+/**
+ * The exact Firestore shape for a lesson document. All launch URLs are derived
+ * from the validated video id; only display metadata comes from the client.
+ */
+export function normalizeCourseVideos(videos = []) {
+  return (Array.isArray(videos) ? videos : []).map((video, index) => {
+    const videoId = String(video.videoId || '').trim();
+    const position = Number.isInteger(video.position) ? video.position : index;
+    const durationSeconds = Math.max(0, Number(video.durationSeconds) || 0);
+    const fallbackId = `${videoId || 'video'}-${position + 1}`;
+    const id = YOUTUBE_PLAYLIST_ITEM_ID_RE.test(String(video.id || ''))
+      ? String(video.id)
+      : fallbackId;
+
+    return {
+      id,
+      videoId,
+      position,
+      title: sanitizeText(video.title, { max: 300 }) || 'Untitled video',
+      description: sanitizeText(video.description, { max: 2000, multiline: true }),
+      thumbnailUrl: sanitizeText(video.thumbnailUrl, { max: 800 }),
+      durationSeconds,
+      durationText:
+        sanitizeText(video.durationText, { max: 20 }) || formatDuration(durationSeconds),
+      publishedAt: sanitizeText(video.publishedAt, { max: 40 }),
+      channelTitle: sanitizeText(video.channelTitle, { max: 160 }),
+      available: video.available !== false,
+      embeddable: video.embeddable !== false,
+      privacyStatus: sanitizeText(video.privacyStatus, { max: 20 }),
+      sourceUrl: youtubeVideoUrl(videoId),
+      embedUrl: youtubeEmbedUrl(videoId)
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // slugs
 // ---------------------------------------------------------------------------
@@ -299,6 +334,9 @@ export const RESOURCE_LIST_FIELDS = [
   'sourceName',
   'sourceUrl',
   'youtubePlaylistId',
+  'youtubePlaylistTitle',
+  'youtubeChannelTitle',
+  'youtubeVideoCount',
   'viewCount',
   'saveCount',
   'ratingAvg',

@@ -13,13 +13,13 @@ import {
   deleteDoc,
   addDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import seedData from '../../../firebase/seed/resources.json';
 import seedCategories from '../../../firebase/seed/categories.json';
 import seedAlternatives from '../../../firebase/seed/alternatives.json';
-import { db, storage } from './firebase';
-import { localized, normalizeTimestamp, safeFileName, slugify } from './utils';
+import { db } from './firebase';
+import { localized, normalizeTimestamp, slugify } from './utils';
 import { parseYouTubePlaylistId, youtubePlaylistUrl } from './youtube';
+import { prepareThumbnail, uploadThumbnail } from './thumbnails';
 
 export const isDemoMode = !db;
 
@@ -57,6 +57,9 @@ export function normalizeResource(raw) {
     sourceName,
     sourceUrl,
     youtubePlaylistId,
+    youtubePlaylistTitle: raw.youtubePlaylistTitle || '',
+    youtubeChannelTitle: raw.youtubeChannelTitle || '',
+    youtubeVideoCount: Number(raw.youtubeVideoCount) || 0,
     // Legacy aliases kept so older components keep working.
     provider: sourceName,
     url: sourceUrl,
@@ -295,6 +298,150 @@ export async function setProgress(uid, resourceId, status) {
 }
 
 // ---------------------------------------------------------------------------
+// Course lessons, per-lesson progress and notes
+// ---------------------------------------------------------------------------
+
+/**
+ * Lesson metadata is stored in a subcollection so long playlists are not
+ * limited by Firestore's per-document size. Read access is granted only while
+ * the parent resource is published (see firestore.rules).
+ */
+export async function fetchCourseVideos(resourceId) {
+  if (!db || !resourceId) return [];
+  const snap = await getDocs(collection(db, 'resources', resourceId, 'videos'));
+  return snap.docs
+    .map((entry) => {
+      const data = entry.data() || {};
+      return {
+        ...data,
+        id: entry.id,
+        position: Number(data.position) || 0,
+        durationSeconds: Number(data.durationSeconds) || 0
+      };
+    })
+    .sort((a, b) => a.position - b.position);
+}
+
+export async function fetchCourseProgress(uid, resourceId) {
+  if (!db || !uid || !resourceId) {
+    return { status: 'not_started', completedVideoIds: [], lastVideoId: null };
+  }
+  const snap = await getDoc(doc(db, 'progress', progressDocId(uid, resourceId)));
+  if (!snap.exists()) {
+    return { status: 'not_started', completedVideoIds: [], lastVideoId: null };
+  }
+  const data = snap.data() || {};
+  return {
+    status: normalizeProgressStatus(data.status),
+    completedVideoIds: Array.isArray(data.completedVideoIds)
+      ? data.completedVideoIds.filter((id) => typeof id === 'string').slice(0, 5000)
+      : [],
+    lastVideoId: typeof data.lastVideoId === 'string' ? data.lastVideoId : null
+  };
+}
+
+export async function saveCourseProgress(
+  uid,
+  resourceId,
+  { status, completedVideoIds, lastVideoId } = {}
+) {
+  if (!db || !uid) throw new Error('Sign in to track progress.');
+  const id = progressDocId(uid, resourceId);
+  const payload = {
+    id,
+    userId: uid,
+    resourceId,
+    updatedAt: serverTimestamp()
+  };
+
+  if (status) payload.status = normalizeProgressStatus(status);
+  if (Array.isArray(completedVideoIds)) {
+    payload.completedVideoIds = [
+      ...new Set(
+        completedVideoIds
+          .filter((videoId) => typeof videoId === 'string' && videoId)
+          .map((videoId) => videoId.slice(0, 128))
+      )
+    ].slice(0, 5000);
+  }
+  if (lastVideoId !== undefined) {
+    payload.lastVideoId = lastVideoId ? String(lastVideoId).slice(0, 128) : null;
+  }
+
+  await setDoc(doc(db, 'progress', id), payload, { merge: true });
+}
+
+function courseNoteId(resourceId, videoId) {
+  return `${resourceId}_${videoId}`
+    .replace(/[^A-Za-z0-9_-]/g, '_')
+    .slice(0, 180);
+}
+
+export async function fetchCourseNotes(uid, resourceId) {
+  if (!db || !uid || !resourceId) return [];
+  const snap = await getDocs(
+    query(
+      collection(db, 'users', uid, 'courseNotes'),
+      where('resourceId', '==', resourceId)
+    )
+  );
+  return snap.docs
+    .map((entry) => {
+      const data = entry.data() || {};
+      return {
+        ...data,
+        id: entry.id,
+        createdAt: normalizeTimestamp(data.createdAt),
+        updatedAt: normalizeTimestamp(data.updatedAt)
+      };
+    })
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+}
+
+export async function saveCourseNote({
+  uid,
+  resourceId,
+  videoId,
+  videoTitle = '',
+  body = ''
+}) {
+  if (!db || !uid || !resourceId || !videoId) {
+    throw new Error('Sign in to save notes.');
+  }
+  const text = String(body || '').trim().slice(0, 4000);
+  const id = courseNoteId(resourceId, videoId);
+  const ref = doc(db, 'users', uid, 'courseNotes', id);
+
+  if (!text) {
+    await deleteDoc(ref);
+    return null;
+  }
+
+  const existing = await getDoc(ref);
+  await setDoc(
+    ref,
+    {
+      id,
+      userId: uid,
+      resourceId,
+      videoId,
+      videoTitle: String(videoTitle || '').slice(0, 300),
+      body: text,
+      ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  return { id, videoId, body: text, videoTitle };
+}
+
+export async function deleteCourseNote(uid, resourceId, videoId) {
+  if (!db || !uid || !resourceId || !videoId) return;
+  await deleteDoc(doc(db, 'users', uid, 'courseNotes', courseNoteId(resourceId, videoId)));
+}
+
+// ---------------------------------------------------------------------------
 // Reviews (top-level collection, id "<resourceId>_<uid>")
 // ---------------------------------------------------------------------------
 
@@ -509,22 +656,15 @@ export async function submitResource({ uid, email, values, thumbnailFile }) {
   if (!db) throw new Error('Firebase is not configured. Resource submission is unavailable in preview mode.');
 
   let thumbnailUrl = null;
-  if (thumbnailFile && storage) {
+  if (thumbnailFile) {
     if (!thumbnailFile.type.startsWith('image/')) {
       throw new Error('Thumbnail must be an image file.');
     }
-    if (thumbnailFile.size > 2 * 1024 * 1024) {
-      throw new Error('Thumbnail must be smaller than 2 MB.');
+    if (thumbnailFile.size > 5 * 1024 * 1024) {
+      throw new Error('Thumbnail must be smaller than 5 MB.');
     }
-    const thumbnailRef = ref(
-      storage,
-      `thumbnails/${uid}/${Date.now()}-${safeFileName(thumbnailFile.name)}`
-    );
-    await uploadBytes(thumbnailRef, thumbnailFile, {
-      contentType: thumbnailFile.type,
-      cacheControl: 'public,max-age=31536000,immutable'
-    });
-    thumbnailUrl = await getDownloadURL(thumbnailRef);
+    const prepared = await prepareThumbnail(thumbnailFile);
+    thumbnailUrl = await uploadThumbnail(prepared, uid);
   }
 
   const resourceRef = doc(collection(db, 'resources'));

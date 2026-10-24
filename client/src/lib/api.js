@@ -187,6 +187,19 @@ export function testResourceLink(url, token) {
   });
 }
 
+/**
+ * POST /api/admin/resources/youtube/preview
+ * Loads a public playlist and every video in it through the server-side
+ * YouTube API key. Video metadata is saved only when the resource is saved.
+ */
+export function previewYouTubePlaylist(url, token) {
+  return apiRequest('/api/admin/resources/youtube/preview', {
+    method: 'POST',
+    body: { url },
+    token
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin — categories
 // ---------------------------------------------------------------------------

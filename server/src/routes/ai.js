@@ -7,6 +7,7 @@ import { apiError } from '../lib/http.js';
 import { sanitizeText } from '../lib/validation.js';
 import { resolveAiConfig } from '../lib/settings.js';
 import { readDailyUsage, incrementDailyUsage, recordAiFailure } from '../lib/quota.js';
+import { findRelevantSitePages } from '../lib/siteGuide.js';
 import {
   findRelevantResources,
   generateLearnMateReply,
@@ -181,6 +182,7 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
     }
 
     const sources = await findRelevantResources(lastUserMessage.content, locale, 6);
+    const sitePages = findRelevantSitePages(lastUserMessage.content, locale, 3);
 
     let reply;
     try {
@@ -199,7 +201,8 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
 
     return res.json({
       reply,
-      sources: sources.map((source) => resourceSummary(source, locale))
+      sources: sources.map((source) => resourceSummary(source, locale)),
+      sitePages
     });
   } catch (error) {
     return next(error);
