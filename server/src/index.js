@@ -9,6 +9,8 @@ import { healthRouter } from './routes/health.js';
 import { reportsRouter } from './routes/reports.js';
 import { aiRouter } from './routes/ai.js';
 import { adminRouter } from './routes/admin.js';
+import { communityRouter } from './routes/community.js';
+import { blockDuringMaintenance } from './middleware/maintenance.js';
 import { errorHandler, notFoundHandler } from './lib/http.js';
 
 initFirebase();
@@ -34,7 +36,8 @@ app.use(
       if (!config.isProduction && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+      // Answer without CORS headers (the browser blocks it) instead of a 500.
+      return callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -72,6 +75,10 @@ app.get('/', (req, res) => {
       '/api/reports',
       '/api/ai/chat',
       '/api/ai/roadmap',
+      '/api/reviews',
+      '/api/bookmarks/:resourceId',
+      '/api/resources/:resourceId/view',
+      '/api/me',
       '/api/admin/me',
       '/api/admin/stats',
       '/api/admin/resources',
@@ -97,9 +104,11 @@ app.get('/', (req, res) => {
 
 app.use('/api', globalLimiter);
 app.use('/api/health', healthRouter);
+// Reports stay open during maintenance so copyright notices still reach us.
 app.use('/api/reports', reportsRouter);
-app.use('/api/ai', aiRouter);
+app.use('/api/ai', blockDuringMaintenance, aiRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api', blockDuringMaintenance, communityRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

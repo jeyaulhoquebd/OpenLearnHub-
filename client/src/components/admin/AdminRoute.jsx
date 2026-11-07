@@ -8,8 +8,8 @@ import { useToast } from '../../context/ToastContext';
 /**
  * Route guard for /admin/*.
  *
- * Waits for auth to settle, then re-checks the *current* ID token with
- * `getIdTokenResult()` instead of trusting a cached value — a claim granted by
+ * Waits for auth to settle, then force-refreshes the ID token with
+ * `getIdTokenResult(true)` instead of trusting a cached value — a claim granted by
  * `npm run set-admin` only appears in a freshly minted token. Anyone without
  * `admin === true` is sent home with a translated "Access denied" toast and
  * never sees the admin shell.
@@ -36,7 +36,7 @@ export default function AdminRoute({ children }) {
 
     (async () => {
       try {
-        const result = await user.getIdTokenResult();
+        const result = await user.getIdTokenResult(true);
         if (active) {
           setCheck({ checking: false, allowed: result?.claims?.admin === true });
         }

@@ -184,16 +184,16 @@ Without `.env` files you get preview mode. To enable accounts and moderation, co
 cp client/.env.example client/.env
 ```
 
-Fill in the required `VITE_FIREBASE_*` values from the web app config (`VITE_FIREBASE_MEASUREMENT_ID` is optional — it only enables Analytics in production builds; `VITE_FIREBASE_STORAGE_BUCKET` is only needed for legacy Storage URLs). Keep `VITE_API_URL=http://localhost:8080` for local development.
+Fill in the required `VITE_FIREBASE_*` values from the web app config (`VITE_FIREBASE_MEASUREMENT_ID` is optional — it only enables Analytics in production builds; `VITE_FIREBASE_STORAGE_BUCKET` is only needed for legacy Storage URLs). Keep `VITE_API_URL=http://localhost:8080` for local development. A production build **fails** without `VITE_API_URL`, because Firebase Hosting rewrites `/api` to `index.html` (set `VITE_ALLOW_RELATIVE_API=true` only if your host proxies `/api`).
 
 Add the public Cloudinary values too:
 
 ```dotenv
-VITE_CLOUDINARY_CLOUD_NAME=y6fui3kz
-VITE_CLOUDINARY_UPLOAD_PRESET=openlearnhub
+VITE_CLOUDINARY_CLOUD_NAME=your-cloud-name
+VITE_CLOUDINARY_UPLOAD_PRESET=your-unsigned-preset
 ```
 
-These are public by design because unsigned uploads run in the browser. Never put the Cloudinary API secret in a `VITE_*` variable.
+These are public by design because unsigned uploads run in the browser, and there is no built-in fallback account. Restrict the unsigned preset in the Cloudinary console (allowed formats `jpg,png,webp`, a small max file size, a fixed folder, incoming transformation `c_limit,w_800`) so it cannot be abused. Never put the Cloudinary API secret in a `VITE_*` variable.
 
 > `VITE_*` values are **public** by design (they identify the Firebase project). They are not secrets. Never put the LLM key or a service-account key in a `VITE_*` variable.
 
@@ -266,14 +266,14 @@ This writes the 35 records in `firebase/seed/resources.json` into the `resources
 
 ```bash
 # from the repository root — accepts a UID or an email address
-npm run set-admin -w server -- fEbrHXzHl2hkvo7wZQw9wzinMlx1
-npm run set-admin -w server -- jeyaulhoquejaber@gmail.com
+npm run set-admin -w server -- <firebase-uid>
+npm run set-admin -w server -- you@example.com
 # revoke admin access again
-npm run set-admin -w server -- jeyaulhoquejaber@gmail.com --remove
+npm run set-admin -w server -- you@example.com --remove
 # or run it directly: cd server && node scripts/set-admin.js <uid-or-email>
 ```
 
-With no argument, the script uses the first address in `ADMIN_EMAILS`, falling back to the project's first admin UID. It sets (or clears) the `admin: true` **custom claim** and appends an `admin.grant` / `admin.revoke` entry to the server-only audit log.
+With no argument, the script uses the first address in `ADMIN_EMAILS`; with neither, it stops instead of guessing an account. It sets (or clears) the `admin: true` **custom claim** and appends an `admin.grant` / `admin.revoke` entry to the server-only audit log.
 
 **Sign out and back in** (or refresh the ID token) so the new claim is applied, then open `/admin`. The client reads admin rights from `getIdTokenResult()` — there is no client-writable `role` field.
 
@@ -368,6 +368,7 @@ Leaving the six required Firebase values empty is supported and enables preview 
 | `GROQ_MAX_OUTPUT_TOKENS` | No | Default `1024` |
 | `GROQ_ROADMAP_MAX_OUTPUT_TOKENS` | No | Default `2048` |
 | `AI_DAILY_LIMIT_PER_USER` | No | Default daily roadmap limit per user when `settings/ai` has no value (`10`) |
+| `AI_CHAT_DAILY_LIMIT_PER_USER` | No | Daily LearnMate chat messages per user (`60`), on top of the hourly limit |
 | `SETTINGS_ENCRYPTION_KEY` | For admin AI settings | AES-256-GCM key (`openssl rand -hex 32`) that encrypts the key stored in `settings/ai` |
 | `REPORT_RATE_LIMIT_PER_HOUR` | No | Default `12` |
 | `AI_RATE_LIMIT_PER_HOUR` | No | Default `25` |
@@ -507,14 +508,15 @@ maintenance so an administrator can turn it off again.
 
 - Published resources: public read.
 - Pending/rejected resources: visible to the submitter and admins only.
-- Resource create: signed-in user, `status: "pending"`, `featured: false`, `title`/`description` maps with an English value, HTTPS `sourceUrl`, required fields, length limits.
-- Resource update/delete, categories, alternatives: admins only.
-- Profiles: owner-only writes with an immutable `role`; owner deletes allowed.
-- Bookmarks & progress: owner-only, composite id `<uid>_<resourceId>`. Course progress may also store `completedVideoIds` (≤ 5,000 ids) and `lastVideoId`.
+- Resource create: signed-in user, `status: "pending"`, `featured: false`, `title`/`description` maps with an English value, HTTPS `sourceUrl`, required fields, length limits, and a key whitelist (counters such as `ratingAvg`/`viewCount` cannot be pre-filled).
+- Resource update/delete, categories, alternatives: server-only (admin API). Direct browser writes are denied even for admins, so every change is audited and a revoked admin token cannot be used.
+- Profiles: owner-only writes limited to the profile fields (`displayName`, `photoURL`, `preferredLanguage`, login timestamps…); `createdAt` is immutable; deletion goes through `DELETE /api/me`.
+- Bookmarks: server-only writes (`/api/bookmarks/:resourceId`) so `saveCount` stays exact; owner-only reads.
+- Progress: owner-only, composite id `<uid>_<resourceId>`, key whitelist. Course progress may also store `completedVideoIds` (≤ 5,000 ids) and `lastVideoId`.
 - YouTube lessons: `resources/{resourceId}/videos/{lessonId}` is written only by the Admin SDK. Client reads follow the parent resource: published courses are public; drafts are limited to admins and the original submitter.
 - Course notes: `users/{uid}/courseNotes/{noteId}` is owner-only, capped at 4,000 characters per note.
 - Roadmaps: `users/{uid}/roadmaps` is owner-only read/delete; create is limited to bounded content (`goal` ≤ 300 chars, `title` ≤ 200, ≤ 20 steps); updates are denied. The top-level `roadmaps` collection is legacy and no longer written.
-- Reviews: verified email required, one per resource, owner-only edits.
+- Reviews: public read of visible reviews; writes only through `/api/reviews` (verified email, published resource, author name set server-side, rating recomputed in the same transaction). A review hidden by a moderator cannot be deleted and re-posted.
 - `settings/site`: public read so every visitor can see the banner and maintenance switch; all writes are server-only.
 - Other `settings/*` (including `settings/ai`): completely denied to clients (the server's Admin SDK writes them).
 - `auditLogs/*`: completely denied to clients; only admins can read them through `GET /api/admin/audit-logs`.
@@ -532,6 +534,12 @@ Base URL: `http://localhost:8080` in development.
 | `POST` | `/api/reports` | Optional Firebase ID token | Create a report about a resource (IP rate-limited) |
 | `POST` | `/api/ai/chat` | Firebase ID token | LearnMate reply grounded in curated resources |
 | `POST` | `/api/ai/roadmap` | Firebase ID token + verified email | Structured study roadmap grounded in curated resources (hourly + daily limits) |
+| `POST` | `/api/reviews` | Firebase ID token + verified email | `{ resourceId, rating (1–5 integer), body }` — create/edit own review; recomputes `ratingAvg`/`ratingCount` |
+| `DELETE` | `/api/reviews/:resourceId` | Firebase ID token | Delete own review (refused for moderator-hidden reviews) |
+| `POST` / `DELETE` | `/api/bookmarks/:resourceId` | Firebase ID token | Save / remove a bookmark and update `saveCount` |
+| `POST` | `/api/resources/:resourceId/view` | Optional Firebase ID token | Count a detail-page view (de-duplicated per visitor for 6 hours) |
+| `DELETE` | `/api/me` | Firebase ID token (signed in within 10 min) | Delete the account, profile, bookmarks, progress, notes and roadmaps; reviews are anonymised |
+| `POST` | `/api/admin/resources/:id/moderate` | Admin claim | `{ decision: approve\|reject, note? }` — approve (blocklist check, counters reset) or reject a submission |
 | `GET` | `/api/admin/me` | Admin claim | Confirms the caller's admin claim and returns basic profile fields |
 | `GET` | `/api/admin/stats` | Admin claim | Dashboard aggregates: counts, 30-day series, top resources, latest reports/reviews, auth provider split (cached 60s, `?refresh=1` bypasses) |
 | `GET` | `/api/admin/resources` | Admin claim | Resource list: `q`, `type`, `status`, `category`, `language`, `sort`, `cursor`, `limit` |
@@ -824,7 +832,7 @@ Put `GROQ_API_KEY` and `SETTINGS_ENCRYPTION_KEY` in `server/.env`, not `client/.
 The configured model has been retired by Groq. Check the current list at https://console.groq.com/docs/models, then set `GROQ_MODEL` in `server/.env` or update it in Admin → AI Settings. The old default `llama-3.3-70b-versatile` is no longer available; this project now defaults to `qwen/qwen3.8-27b`.
 
 **`/admin` says "not authorized".**
-Sign out and back in after running `set-admin` so the custom claim is refreshed. Confirm `users/{uid}.role` is `admin`.
+Sign out and back in after running `set-admin` so the custom claim is refreshed (the admin route also force-refreshes the token). Admin access comes only from the `admin` custom claim — no Firestore field is involved.
 
 **CORS errors in production.**
 Add the exact frontend origin (scheme + host, no trailing slash) to `CLIENT_ORIGIN` and restart the API. `*` is rejected in production.

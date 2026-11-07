@@ -53,7 +53,8 @@ export const config = {
     timeoutMs: parseNumber(process.env.GROQ_TIMEOUT_MS, 15000),
     maxOutputTokens: parseNumber(process.env.GROQ_MAX_OUTPUT_TOKENS, 1024),
     roadmapMaxOutputTokens: parseNumber(process.env.GROQ_ROADMAP_MAX_OUTPUT_TOKENS, 2048),
-    dailyLimitPerUser: parseNumber(process.env.AI_DAILY_LIMIT_PER_USER, 10)
+    dailyLimitPerUser: parseNumber(process.env.AI_DAILY_LIMIT_PER_USER, 10),
+    chatDailyLimitPerUser: parseNumber(process.env.AI_CHAT_DAILY_LIMIT_PER_USER, 60)
   },
   // YouTube Data API — server-side only. The public site uses YouTube's
   // official IFrame player, so the key is never sent to the browser.

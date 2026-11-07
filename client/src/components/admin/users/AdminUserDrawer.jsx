@@ -154,7 +154,6 @@ export default function AdminUserDrawer({ open, uid, onClose, onChanged }) {
   const displayName = profile?.displayName || profile?.email || uid || '';
   const confirmMeta = confirmKey ? CONFIRMS[confirmKey] : null;
 
-  const canRemoveAdmin = profile?.isAdmin && !isSelf;
   const canDisable = !isSelf && !profile?.disabled;
   const canEnable = !isSelf && profile?.disabled;
 

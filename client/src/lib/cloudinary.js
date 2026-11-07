@@ -11,13 +11,14 @@
  *   type: upload.
  */
 
-const DEFAULT_CLOUD_NAME = 'y6fui3kz';
-const DEFAULT_UPLOAD_PRESET = 'openlearnhub';
-
-export const CLOUDINARY_CLOUD_NAME =
-  String(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim() || DEFAULT_CLOUD_NAME;
-export const CLOUDINARY_UPLOAD_PRESET =
-  String(import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '').trim() || DEFAULT_UPLOAD_PRESET;
+// No built-in fallback account: forks and previews must not upload into the
+// project owner's Cloudinary. In the Cloudinary console, restrict the unsigned
+// preset (allowed formats: jpg,png,webp; max file size ~2 MB; fixed folder;
+// incoming transformation c_limit,w_800) so it cannot be abused.
+export const CLOUDINARY_CLOUD_NAME = String(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim();
+export const CLOUDINARY_UPLOAD_PRESET = String(
+  import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || ''
+).trim();
 
 export const isCloudinaryConfigured = Boolean(
   CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET

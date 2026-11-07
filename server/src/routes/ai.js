@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { config } from '../config.js';
 import { requireAuth, requireVerifiedEmail } from '../middleware/auth.js';
 import { apiError } from '../lib/http.js';
 import { sanitizeText } from '../lib/validation.js';
 import { resolveAiConfig } from '../lib/settings.js';
-import { readDailyUsage, incrementDailyUsage, recordAiFailure } from '../lib/quota.js';
+import { config } from '../config.js';
+import {
+  incrementDailyUsage,
+  recordAiFailure,
+  releaseDailyUsage,
+  reserveDailyUsage
+} from '../lib/quota.js';
 import { findRelevantSitePages } from '../lib/siteGuide.js';
 import {
   findRelevantResources,
@@ -181,6 +186,22 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
       return apiError(res, 400, 'invalid_chat', 'A user message is required.');
     }
 
+    const reservation = await reserveDailyUsage({
+      uid: req.user.uid,
+      dailyLimit: config.groq.chatDailyLimitPerUser,
+      field: 'chatCount',
+      action: 'chat'
+    });
+    if (!reservation.allowed) {
+      return apiError(
+        res,
+        429,
+        'quota_exceeded',
+        `You have reached today's LearnMate limit (${reservation.limit} messages). Please try again tomorrow.`,
+        { limit: reservation.limit, used: reservation.used, date: reservation.date }
+      );
+    }
+
     const sources = await findRelevantResources(lastUserMessage.content, locale, 6);
     const sitePages = findRelevantSitePages(lastUserMessage.content, locale, 3);
 
@@ -188,6 +209,7 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
     try {
       reply = await generateLearnMateReply({ messages, sources, locale, ai });
     } catch (error) {
+      await releaseDailyUsage({ uid: req.user.uid, field: 'chatCount', reservation });
       return respondToAiError(res, error, {
         action: 'chat',
         fallbackCode: 'llm_error',
@@ -195,8 +217,8 @@ aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res, next) => {
       });
     }
 
-    // Chat has its own hourly limiter; it contributes to the global usage
-    // counters but does not consume the roadmap daily quota.
+    // The per-user chat unit was reserved above; this only bumps the global
+    // usage counters (it does not consume the roadmap daily quota).
     await incrementDailyUsage({ uid: req.user.uid, action: 'chat', countUser: false });
 
     return res.json({
@@ -239,10 +261,15 @@ aiRouter.post(
       const { goal, level } = parsed.data;
       const locale = parsed.data.language || parsed.data.locale || 'en';
 
-      const quota = await readDailyUsage({
+      // Reserve the unit up front (atomic), and give it back on any failure.
+      const quota = await reserveDailyUsage({
         uid: req.user.uid,
-        dailyLimit: ai.dailyLimitPerUser
+        dailyLimit: ai.dailyLimitPerUser,
+        field: 'count',
+        action: 'roadmap'
       });
+      const release = () =>
+        releaseDailyUsage({ uid: req.user.uid, field: 'count', reservation: quota });
       if (!quota.allowed) {
         return apiError(
           res,
@@ -256,6 +283,7 @@ aiRouter.post(
       // Ground the model in real, published resources only (max 40).
       const matches = await findRelevantResources(goal, locale, MAX_CONTEXT_RESOURCES);
       if (!matches.length) {
+        await release();
         return apiError(
           res,
           422,
@@ -268,6 +296,7 @@ aiRouter.post(
       try {
         rawPlan = await generateRoadmapPlan({ goal, level, locale, matches, ai });
       } catch (error) {
+        await release();
         return respondToAiError(res, error, {
           action: 'roadmap',
           fallbackCode: 'llm_error',
@@ -278,6 +307,7 @@ aiRouter.post(
       const normalized = normalizePlan(rawPlan);
       const validated = normalized ? roadmapPlanSchema.safeParse(normalized) : { success: false };
       if (!validated.success) {
+        await release();
         await recordAiFailure({ action: 'roadmap' });
         return apiError(
           res,
@@ -308,6 +338,7 @@ aiRouter.post(
         .filter((step) => step.resourceIds.length > 0);
 
       if (!steps.length) {
+        await release();
         await recordAiFailure({ action: 'roadmap' });
         return apiError(
           res,
@@ -317,8 +348,8 @@ aiRouter.post(
         );
       }
 
-      // Only count a roadmap against the daily quota once it is successfully built.
-      await incrementDailyUsage({ uid: req.user.uid, action: 'roadmap' });
+      // The per-user unit was reserved above; record the global counter only.
+      await incrementDailyUsage({ uid: req.user.uid, action: 'roadmap', countUser: false });
 
       return res.json({
         goal,
@@ -347,7 +378,7 @@ function normalizePlan(raw) {
   return {
     title: asString(raw.title, 200),
     summary: asString(raw.summary, 1200),
-    steps: rawSteps.slice(0, 8).map((step, index) => {
+    steps: rawSteps.slice(0, 10).map((step, index) => {
       const ids = Array.isArray(step?.resourceIds)
         ? step.resourceIds
         : typeof step?.resourceIds === 'string' && step.resourceIds.trim()

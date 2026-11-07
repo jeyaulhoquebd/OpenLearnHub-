@@ -86,10 +86,12 @@ export default function SignupPage() {
               <p className="flex items-start gap-2">
                 <Link2 className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  {t('auth.accountExistsDifferent', {
-                    email: pendingLink.email,
-                    provider: t(providerLabelKey(pendingLink.providerId))
-                  })}
+                  {pendingLink.providerId
+                    ? t('auth.accountExistsDifferent', {
+                        email: pendingLink.email,
+                        provider: t(providerLabelKey(pendingLink.providerId))
+                      })
+                    : t('auth.accountExistsUnknown', { email: pendingLink.email })}
                 </span>
               </p>
               <Link to="/login" className="btn-secondary btn-sm mt-3">

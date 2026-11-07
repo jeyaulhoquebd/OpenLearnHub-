@@ -10,16 +10,13 @@ import { writeAuditLog } from '../src/lib/audit.js';
  *   node scripts/set-admin.js <uid-or-email> --remove
  *
  * The target may be a Firebase UID or an email address — anything containing
- * "@" is treated as an email. When no target is given, the first administrator
- * account for this project is used.
+ * "@" is treated as an email. When no target is given, the first entry of
+ * ADMIN_EMAILS is used; with neither, the script stops instead of guessing.
  *
  * Administrator access is granted exclusively through this custom claim. No
  * Firestore field is ever read to decide whether someone is an admin, so a
  * user can never promote themselves from the client.
  */
-
-// First administrator of the openlearn-hub-bd project.
-const DEFAULT_ADMIN_UID = 'fEbrHXzHl2hkvo7wZQw9wzinMlx1';
 
 function readFlag(name) {
   const prefix = `--${name}=`;
@@ -72,17 +69,20 @@ async function main() {
 
   const { remove, target: rawTarget } = parseArgs();
 
-  // Target resolution: CLI argument, then ADMIN_EMAILS (first entry), then the
-  // first administrator account for this project.
+  // Target resolution: CLI argument, then ADMIN_EMAILS (first entry). There is
+  // deliberately no built-in default account.
   const envEmail = config.firebase.adminEmails?.[0] || '';
-  const target = rawTarget || envEmail || DEFAULT_ADMIN_UID;
+  const target = rawTarget || envEmail;
+
+  if (!target) {
+    console.error(
+      '[set-admin] Pass a UID or email: npm run set-admin -- you@example.com (or set ADMIN_EMAILS).'
+    );
+    process.exit(1);
+  }
 
   if (!rawTarget) {
-    console.log(
-      envEmail
-        ? `[set-admin] No UID or email supplied — using ADMIN_EMAILS (${envEmail}).`
-        : `[set-admin] No UID or email supplied — using the first admin UID (${DEFAULT_ADMIN_UID}).`
-    );
+    console.log(`[set-admin] No UID or email supplied — using ADMIN_EMAILS (${envEmail}).`);
   }
 
   const user = await resolveUser(auth, target);

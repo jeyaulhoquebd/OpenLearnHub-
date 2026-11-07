@@ -38,7 +38,8 @@ import { useResources } from '../hooks/useResources';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { fetchCourseVideos, fetchResourceById, getRelatedResources } from '../lib/data';
+import { fetchCourseVideos, fetchResourceById, getRelatedResources, isDemoMode } from '../lib/data';
+import { recordResourceView } from '../lib/api';
 import { COUNTRY_FLAGS, TYPE_META } from '../lib/constants';
 import { formatDate, formatNumber, localized } from '../lib/utils';
 
@@ -46,7 +47,7 @@ export default function ResourceDetailPage() {
   const { id } = useParams();
   const { t, i18n } = useTranslation();
   const { push } = useToast();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, loading: authLoading } = useAuth();
   const { resources } = useResources();
   const [resource, setResource] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +59,21 @@ export default function ResourceDetailPage() {
   const localizedLongDescription = localized(resource?.longDescription, i18n.language) || localizedDescription;
 
   usePageMeta(localizedTitle || t('common.loading'), localizedDescription);
+
+  // Count one view per page open, once auth has settled (the API also
+  // de-duplicates repeat visits).
+  useEffect(() => {
+    if (!id || isDemoMode || authLoading) return;
+    (async () => {
+      try {
+        const token = user ? await user.getIdToken() : undefined;
+        await recordResourceView(id, token);
+      } catch {
+        /* view counting is best-effort */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, authLoading]);
 
   useEffect(() => {
     let active = true;

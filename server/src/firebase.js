@@ -24,7 +24,17 @@ function buildCredential() {
   // Option A — full service-account JSON (one line, escaped newlines).
   if (serviceAccountJson) {
     try {
-      const parsed = JSON.parse(normalizePrivateKey(serviceAccountJson.trim()));
+      // A correctly pasted one-line JSON keeps "\n" escapes inside
+      // private_key; turning those into real newlines first would make the
+      // JSON invalid. Parse it as-is and only fall back to unescaping for
+      // values that were double-escaped by a hosting dashboard.
+      const raw = serviceAccountJson.trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = JSON.parse(normalizePrivateKey(raw));
+      }
       if (parsed.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key);
       return cert(parsed);
     } catch (error) {

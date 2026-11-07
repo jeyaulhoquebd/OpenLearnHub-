@@ -33,12 +33,11 @@ import {
 } from '../../components/admin/dashboard/DashboardLists';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getAdminStats, updateAdminReport } from '../../lib/api';
+import { getAdminStats, moderateAdminResource, updateAdminReport } from '../../lib/api';
 import { refreshAdminCounts } from '../../hooks/useAdminCounts';
 import {
   fetchPendingResources,
-  fetchPublishedResources,
-  updateResourceStatus
+  fetchPublishedResources
 } from '../../lib/data';
 import { buildDemoStats } from '../../lib/demoStats';
 import { isFirebaseConfigured } from '../../lib/firebase';
@@ -120,7 +119,9 @@ export default function AdminDashboardPage() {
     if (!user) return;
     setBusyId(resource.id);
     try {
-      await updateResourceStatus({ id: resource.id, status: 'published', reviewerUid: user.uid });
+      // Through the API: audited, blocklist-checked, counters reset.
+      const token = await user.getIdToken();
+      await moderateAdminResource(resource.id, { decision: 'approve' }, token);
       setPending((items) => items.filter((item) => item.id !== resource.id));
       invalidateResourceCache();
       push(t('admin.approveSuccess'));
@@ -137,12 +138,12 @@ export default function AdminDashboardPage() {
     if (!user) return;
     setBusyId(resource.id);
     try {
-      await updateResourceStatus({
-        id: resource.id,
-        status: 'rejected',
-        reviewerUid: user.uid,
-        reviewNote: t('admin.rejectSuccess')
-      });
+      const token = await user.getIdToken();
+      await moderateAdminResource(
+        resource.id,
+        { decision: 'reject', note: t('admin.rejectSuccess') },
+        token
+      );
       setPending((items) => items.filter((item) => item.id !== resource.id));
       push(t('admin.rejectSuccess'), { type: 'info' });
       load({ force: true });

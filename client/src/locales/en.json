@@ -228,7 +228,8 @@
     "confirmDelete": "Delete your review of this resource?",
     "error": "We couldn't save your review. Please try again.",
     "anonymous": "Learner",
-    "you": "You"
+    "you": "You",
+    "moderatedNoDelete": "A moderator hid this review, so it cannot be deleted or re-posted."
   },
   "progress": {
     "title": "Your progress",
@@ -345,7 +346,8 @@
     "deleteAccountConfirm": "Yes, delete my account",
     "deleteAccountSuccess": "Your account has been deleted.",
     "signInMethod": "Sign-in method",
-    "preferredLanguage": "Preferred language"
+    "preferredLanguage": "Preferred language",
+    "accountExistsUnknown": "An account already exists for {{email}}. Sign in with the method you used before (Google, GitHub, Apple, or email and password) and we will link your new method."
   },
   "validation": {
     "required": "This field is required.",

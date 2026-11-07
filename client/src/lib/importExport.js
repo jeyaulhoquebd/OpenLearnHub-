@@ -100,7 +100,9 @@ export function csvToObjects(text) {
     const row = {};
     headers.forEach((header, index) => {
       if (!header || row[header] != null) return;
-      row[header] = cells[index] ?? '';
+      const cell = cells[index] ?? '';
+      // Undo the formula guard added by our own CSV export ('=… → =…).
+      row[header] = /^'[=+\-@]/.test(cell) ? cell.slice(1) : cell;
     });
     return row;
   });
@@ -296,7 +298,9 @@ export function chunkRows(rows, size = 400) {
 }
 
 function csvCell(value) {
-  const text = value == null ? '' : String(value);
+  let text = value == null ? '' : String(value);
+  // Neutralise spreadsheet formulas (= + - @) — see server/src/lib/importExport.js.
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

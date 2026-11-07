@@ -1,6 +1,8 @@
 import {
   collection,
   doc,
+  documentId,
+  getCountFromServer,
   getDoc,
   getDocs,
   limit,
@@ -8,7 +10,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
+  startAfter,
   where,
   deleteDoc,
   addDoc
@@ -16,7 +18,13 @@ import {
 import seedData from '../../../firebase/seed/resources.json';
 import seedCategories from '../../../firebase/seed/categories.json';
 import seedAlternatives from '../../../firebase/seed/alternatives.json';
-import { db } from './firebase';
+import { auth, db } from './firebase';
+import {
+  deleteReviewApi,
+  removeBookmarkApi,
+  saveBookmarkApi,
+  saveReviewApi
+} from './api';
 import { localized, normalizeTimestamp, slugify } from './utils';
 import { parseYouTubePlaylistId, youtubePlaylistUrl } from './youtube';
 import { prepareThumbnail, uploadThumbnail } from './thumbnails';
@@ -106,16 +114,39 @@ function isPublished(resource) {
   return !resource.status || resource.status === 'published';
 }
 
+const PUBLISHED_PAGE_SIZE = 500;
+const PUBLISHED_MAX = 5000;
+
+/** Every published listing, read in pages (no silent 500-item cut-off). */
 export async function fetchPublishedResources() {
   if (!db) {
     return demoResources.filter(isPublished).sort(recommendedSort);
   }
 
-  const snap = await getDocs(
-    query(collection(db, 'resources'), where('status', '==', 'published'), limit(500))
-  );
+  const docs = [];
+  let last = null;
+  while (docs.length < PUBLISHED_MAX) {
+    const constraints = [
+      where('status', '==', 'published'),
+      orderBy(documentId()),
+      limit(PUBLISHED_PAGE_SIZE)
+    ];
+    if (last) constraints.push(startAfter(last));
+    // eslint-disable-next-line no-await-in-loop
+    const snap = await getDocs(query(collection(db, 'resources'), ...constraints));
+    docs.push(...snap.docs);
+    if (snap.size < PUBLISHED_PAGE_SIZE) break;
+    last = snap.docs[snap.docs.length - 1];
+  }
 
-  return snap.docs.map(mapResource).sort(recommendedSort);
+  return docs.map(mapResource).sort(recommendedSort);
+}
+
+/** Current user's ID token for the community API calls. */
+async function currentToken() {
+  const current = auth?.currentUser;
+  if (!current) throw new Error('Please sign in to continue.');
+  return current.getIdToken();
 }
 
 export async function fetchResourceById(id) {
@@ -143,8 +174,12 @@ export async function fetchCategories() {
     return [...demoCategories].sort((a, b) => (a.order || 0) - (b.order || 0));
   }
   try {
-    const snap = await getDocs(query(collection(db, 'categories'), orderBy('order', 'asc')));
-    const items = snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+    // Sorted in memory: `orderBy('order')` would silently drop categories
+    // that have no `order` field.
+    const snap = await getDocs(collection(db, 'categories'));
+    const items = snap.docs
+      .map((entry) => ({ id: entry.id, ...entry.data() }))
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
     return items.length ? items : demoCategories;
   } catch (error) {
     console.warn('[categories]', error);
@@ -207,9 +242,27 @@ export async function fetchBookmarkIds(uid) {
 }
 
 export async function fetchBookmarks(uid) {
-  const ids = await fetchBookmarkIds(uid);
-  const resources = await Promise.all(ids.map((id) => fetchResourceById(id).catch(() => null)));
-  return resources.filter(Boolean);
+  const ids = [...new Set(await fetchBookmarkIds(uid))];
+  if (!db || !ids.length) return [];
+
+  // Batched `in` queries (30 ids each) instead of one read per bookmark. The
+  // status filter keeps the query inside the security rules.
+  const chunks = [];
+  for (let index = 0; index < ids.length; index += 30) chunks.push(ids.slice(index, index + 30));
+  const snaps = await Promise.all(
+    chunks.map((chunk) =>
+      getDocs(
+        query(
+          collection(db, 'resources'),
+          where(documentId(), 'in', chunk),
+          where('status', '==', 'published')
+        )
+      ).catch(() => null)
+    )
+  );
+  const byId = new Map();
+  snaps.forEach((snap) => snap?.docs.forEach((entry) => byId.set(entry.id, mapResource(entry))));
+  return ids.map((id) => byId.get(id)).filter(Boolean);
 }
 
 export async function isBookmarked(uid, resourceId) {
@@ -224,25 +277,15 @@ export async function isBookmarked(uid, resourceId) {
   }
 }
 
+// Bookmark writes go through the API so the resource's saveCount stays exact.
 export async function saveBookmark(uid, resourceId) {
   if (!db || !uid) throw new Error('Sign in to save resources.');
-  const id = bookmarkDocId(uid, resourceId);
-  await setDoc(doc(db, 'bookmarks', id), {
-    id,
-    userId: uid,
-    resourceId,
-    savedAt: serverTimestamp()
-  });
+  await saveBookmarkApi(resourceId, await currentToken());
 }
 
 export async function removeBookmark(uid, resourceId) {
   if (!db || !uid) throw new Error('Sign in to save resources.');
-  await deleteDoc(doc(db, 'bookmarks', bookmarkDocId(uid, resourceId)));
-  try {
-    await deleteDoc(doc(db, 'users', uid, 'bookmarks', resourceId));
-  } catch {
-    /* legacy doc may not exist */
-  }
+  await removeBookmarkApi(resourceId, await currentToken());
 }
 
 // ---------------------------------------------------------------------------
@@ -492,36 +535,18 @@ export async function fetchUserReview(resourceId, uid) {
   return snap.exists() ? mapReview(snap) : null;
 }
 
-export async function saveReview({ resourceId, uid, authorName, rating, body }) {
+/**
+ * Reviews are written by the API, which verifies the account, sets the author
+ * name, keeps moderation state and recomputes the resource rating atomically.
+ */
+export async function saveReview({ resourceId, uid, rating, body }) {
   if (!db || !uid) throw new Error('Sign in to review resources.');
-  const id = reviewDocId(resourceId, uid);
-  const existing = await getDoc(doc(db, 'reviews', id));
-  const text = body;
-  await setDoc(
-    doc(db, 'reviews', id),
-    {
-      id,
-      resourceId,
-      userId: uid,
-      authorName: authorName || null,
-      rating,
-      // `body` is the canonical field (validated by the security rules);
-      // `comment` is kept in sync for the documented data model.
-      body: text,
-      comment: text,
-      // Moderation state is public-readable; only the admin API may flip it
-      // (security rules pin it to its previous value on author updates).
-      hidden: existing.exists() ? existing.data().hidden === true : false,
-      createdAt: existing.exists() ? existing.data().createdAt || serverTimestamp() : serverTimestamp(),
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  return saveReviewApi({ resourceId, rating, body }, await currentToken());
 }
 
 export async function deleteReview(resourceId, uid) {
   if (!db || !uid) throw new Error('Sign in to review resources.');
-  await deleteDoc(doc(db, 'reviews', reviewDocId(resourceId, uid)));
+  return deleteReviewApi(resourceId, await currentToken());
 }
 
 /** Aggregate rating from a list of review documents. */
@@ -691,10 +716,8 @@ export async function submitResource({ uid, email, values, thumbnailFile }) {
     platform: values.platform || [],
     featured: false,
     thumbnailUrl,
-    ratingAvg: 0,
-    ratingCount: 0,
-    viewCount: 0,
-    saveCount: 0,
+    // Counters (ratingAvg, viewCount…) are set by the server on approval;
+    // the security rules reject them here.
     // Community submissions stay in the legacy review queue.
     status: 'pending',
     createdBy: uid,
@@ -707,31 +730,16 @@ export async function submitResource({ uid, email, values, thumbnailFile }) {
   return resourceRef.id;
 }
 
-export async function updateResourceStatus({ id, status, reviewerUid, reviewNote = '' }) {
-  if (!db) throw new Error('Firebase is not configured.');
-  const payload = {
-    status,
-    reviewedBy: reviewerUid,
-    reviewedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    reviewNote
-  };
-  if (status === 'published') payload.publishedAt = serverTimestamp();
-  await updateDoc(doc(db, 'resources', id), payload);
-}
-
 export async function fetchAdminCounts() {
   if (!db) return { resources: demoResources.length, pending: 0, reports: 0 };
-  const [publishedSnap, pendingSnap, reportsSnap] = await Promise.all([
-    getDocs(query(collection(db, 'resources'), where('status', '==', 'published'))),
-    getDocs(query(collection(db, 'resources'), where('status', '==', 'pending'))),
-    getDocs(query(collection(db, 'reports'), where('status', '==', 'open')))
+  // Server-side aggregation: counts without downloading every document.
+  const count = (q) => getCountFromServer(q).then((snap) => snap.data().count);
+  const [resources, pending, reports] = await Promise.all([
+    count(query(collection(db, 'resources'), where('status', '==', 'published'))),
+    count(query(collection(db, 'resources'), where('status', '==', 'pending'))),
+    count(query(collection(db, 'reports'), where('status', '==', 'open')))
   ]);
-  return {
-    resources: publishedSnap.size,
-    pending: pendingSnap.size,
-    reports: reportsSnap.size
-  };
+  return { resources, pending, reports };
 }
 
 // ---------------------------------------------------------------------------

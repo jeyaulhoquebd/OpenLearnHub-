@@ -7,6 +7,7 @@ import { writeAuditLogForRequest } from '../lib/audit.js';
 import { findBlockedSource } from '../../config/blocklist.js';
 import { checkUrl } from '../lib/linkCheck.js';
 import { deleteCourseVideos, syncCourseVideos } from '../lib/courseVideos.js';
+import { deleteResourceData } from '../lib/cleanup.js';
 import { fetchPlaylistCourse } from '../lib/youtube.js';
 import {
   LIST_SORTS,
@@ -58,6 +59,11 @@ const listQuerySchema = z.object({
 const bulkSchema = z.object({
   ids: z.array(z.string().trim().min(1).max(128)).min(1).max(100),
   action: z.enum(['publish', 'draft', 'flag', 'delete'])
+});
+
+const moderateSchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+  note: z.string().trim().max(500).optional().default('')
 });
 
 const testLinkSchema = z.object({
@@ -259,6 +265,22 @@ adminResourcesRouter.post('/bulk', async (req, res, next) => {
       return res.json({ ok: true, action: parsed.action, requested: ids.length, affected: 0 });
     }
 
+    // Publishing must pass the same legal-source check as the edit form.
+    if (parsed.action === 'publish') {
+      const blocked = existing
+        .map((snapshot) => ({ id: snapshot.id, hit: findBlockedSource(snapshot.data() || {}) }))
+        .filter((entry) => entry.hit);
+      if (blocked.length) {
+        return apiError(
+          res,
+          422,
+          'blocked_source',
+          'Some selected resources point at blocked sources and were not published.',
+          { ids: blocked.map((entry) => entry.id).slice(0, 20) }
+        );
+      }
+    }
+
     const batch = db.batch();
 
     if (parsed.action === 'delete') {
@@ -278,7 +300,12 @@ adminResourcesRouter.post('/bulk', async (req, res, next) => {
     await batch.commit();
 
     if (parsed.action === 'delete') {
-      await Promise.all(existing.map((snapshot) => deleteCourseVideos(db, snapshot.id)));
+      await Promise.all(
+        existing.map(async (snapshot) => {
+          await deleteCourseVideos(db, snapshot.id);
+          await deleteResourceData(db, snapshot.id);
+        })
+      );
     }
 
     await auditResource(req, 'resource.bulk', null, {
@@ -294,6 +321,73 @@ adminResourcesRouter.post('/bulk', async (req, res, next) => {
       requested: ids.length,
       affected: existing.length
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * POST /api/admin/resources/:id/moderate { decision: approve|reject, note }
+ * Reviews a community submission. Approval runs the blocklist check and resets
+ * every counter/flag a submitter could have pre-filled, then publishes.
+ */
+adminResourcesRouter.post('/:id/moderate', async (req, res, next) => {
+  try {
+    const db = requireDb(res);
+    if (!db) return undefined;
+
+    const { id } = req.params;
+    if (!id || id.length > 128) {
+      return apiError(res, 400, 'invalid_id', 'That resource id is not valid.');
+    }
+    const parsed = parseBody(res, moderateSchema, req.body);
+    if (!parsed) return undefined;
+
+    const ref = db.collection('resources').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) {
+      return apiError(res, 404, 'resource_not_found', 'That resource no longer exists.');
+    }
+    const data = snapshot.data() || {};
+    const now = FieldValue.serverTimestamp();
+    const note = parsed.note ? parsed.note.slice(0, 500) : '';
+
+    if (parsed.decision === 'approve') {
+      const hit = findBlockedSource(data);
+      if (blockedResponse(res, hit)) return undefined;
+
+      await ref.update({
+        status: 'published',
+        featured: false,
+        viewCount: 0,
+        saveCount: 0,
+        ratingAvg: 0,
+        ratingCount: 0,
+        reviewedBy: req.user.uid,
+        reviewedAt: now,
+        reviewNote: note,
+        updatedAt: now,
+        updatedBy: req.user.uid,
+        ...(data.publishedAt ? {} : { publishedAt: now })
+      });
+    } else {
+      await ref.update({
+        status: 'rejected',
+        reviewedBy: req.user.uid,
+        reviewedAt: now,
+        reviewNote: note,
+        updatedAt: now,
+        updatedBy: req.user.uid
+      });
+    }
+
+    await auditResource(req, `resource.${parsed.decision}`, id, {
+      title: data.title?.en || (typeof data.title === 'string' ? data.title : ''),
+      previousStatus: data.status || '',
+      createdBy: data.createdBy || ''
+    });
+
+    return res.json({ ok: true, id, status: parsed.decision === 'approve' ? 'published' : 'rejected' });
   } catch (error) {
     return next(error);
   }
@@ -480,11 +574,16 @@ adminResourcesRouter.delete('/:id', async (req, res, next) => {
     const data = snapshot.data() || {};
     await deleteCourseVideos(db, id);
     await ref.delete();
+    const removed = await deleteResourceData(db, id);
 
     await auditResource(req, 'resource.delete', id, {
       title: data.title?.en || '',
       type: data.type || '',
-      slug: data.slug || ''
+      slug: data.slug || '',
+      removedReviews: removed.reviews,
+      removedBookmarks: removed.bookmarks,
+      removedProgress: removed.progress,
+      disabledAlternatives: removed.alternatives
     });
 
     return res.json({ ok: true, id });

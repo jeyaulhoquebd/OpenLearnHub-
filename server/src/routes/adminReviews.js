@@ -101,7 +101,10 @@ adminReviewsRouter.get('/', async (req, res, next) => {
     const { q, resourceId, rating, cursor, limit } = parsed.data;
 
     let query = db.collection('reviews');
-    if (resourceId) query = query.where('resourceId', '==', resourceId);
+    // Newest first, so the scan window always contains the latest reviews.
+    query = resourceId
+      ? query.where('resourceId', '==', resourceId)
+      : query.orderBy('createdAt', 'desc');
 
     const snapshot = await query.limit(REVIEW_SCAN_LIMIT).get();
     const resources = await loadResources(
