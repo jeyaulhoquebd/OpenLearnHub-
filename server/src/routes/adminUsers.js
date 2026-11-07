@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { FieldValue } from 'firebase-admin/firestore';
+import { deleteUserData } from '../lib/cleanup.js';
 import { getDb, getFirebaseAuth } from '../firebase.js';
 import { apiError } from '../lib/http.js';
 import { writeAuditLogForRequest } from '../lib/audit.js';
@@ -94,51 +94,6 @@ function audit(req, action, uid, details = {}) {
     targetId: uid,
     details
   });
-}
-
-/** Deletes matching docs in batches of 400 (Firestore's write cap is 500). */
-async function deleteMatching(db, collectionName, field, value) {
-  const snapshot = await db.collection(collectionName).where(field, '==', value).get();
-  if (snapshot.empty) return 0;
-
-  let deleted = 0;
-  for (let index = 0; index < snapshot.docs.length; index += 400) {
-    const batch = db.batch();
-    snapshot.docs.slice(index, index + 400).forEach((doc) => batch.delete(doc.ref));
-    // eslint-disable-next-line no-await-in-loop
-    await batch.commit();
-    deleted += Math.min(400, snapshot.docs.length - index);
-  }
-  return deleted;
-}
-
-/**
- * Keeps reviews (so ratings stay honest) but strips the author's identity.
- * The userId becomes "deleted", which also means the author can never claim or
- * edit the row again.
- */
-async function anonymizeReviews(db, uid) {
-  const snapshot = await db.collection('reviews').where('userId', '==', uid).get();
-  if (snapshot.empty) return 0;
-
-  let updated = 0;
-  for (let index = 0; index < snapshot.docs.length; index += 400) {
-    const batch = db.batch();
-    snapshot.docs.slice(index, index + 400).forEach((doc) =>
-      batch.update(doc.ref, {
-        userId: 'deleted',
-        authorName: null,
-        authorEmail: null,
-        userPhotoURL: null,
-        anonymized: true,
-        anonymizedAt: FieldValue.serverTimestamp()
-      })
-    );
-    // eslint-disable-next-line no-await-in-loop
-    await batch.commit();
-    updated += Math.min(400, snapshot.docs.length - index);
-  }
-  return updated;
 }
 
 export const adminUsersRouter = Router();
@@ -262,6 +217,8 @@ adminUsersRouter.post('/:uid/disable', async (req, res, next) => {
 
     if (!record.disabled) {
       await auth.updateUser(record.uid, { disabled: true });
+      // Existing ID tokens stay valid for up to an hour otherwise.
+      await auth.revokeRefreshTokens(record.uid);
       await audit(req, 'user.disable', record.uid, {
         email: record.email || '',
         displayName: record.displayName || ''
@@ -360,6 +317,8 @@ adminUsersRouter.post('/:uid/remove-admin', async (req, res, next) => {
         ...(record.customClaims || {}),
         admin: false
       });
+      // Force a new token so the removed claim stops working immediately.
+      await auth.revokeRefreshTokens(record.uid);
       await audit(req, 'user.remove_admin', record.uid, {
         email: record.email || '',
         displayName: record.displayName || ''
@@ -457,15 +416,7 @@ adminUsersRouter.delete('/:uid', async (req, res, next) => {
     // Firestore cleanup first: if it fails we abort before removing the Auth
     // account, and the operation can be retried safely (all steps are idempotent).
     if (db) {
-      deletedBookmarks = await deleteMatching(db, 'bookmarks', 'userId', record.uid);
-      deletedProgress = await deleteMatching(db, 'progress', 'userId', record.uid);
-      anonymizedReviews = await anonymizeReviews(db, record.uid);
-
-      try {
-        await db.collection('users').doc(record.uid).delete();
-      } catch (error) {
-        console.warn('[admin-users] Could not delete profile:', error?.message || error);
-      }
+      ({ deletedBookmarks, deletedProgress, anonymizedReviews } = await deleteUserData(db, record.uid));
     }
 
     await auth.deleteUser(record.uid);

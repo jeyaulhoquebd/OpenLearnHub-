@@ -23,6 +23,19 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
+    // Key whitelist that tolerates older documents: on create every key must
+    // be listed; on update only the keys being added or changed must be.
+    function writesOnly(keys) {
+      return resource == null
+        ? request.resource.data.keys().hasOnly(keys)
+        : request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function isOptionalString(data, field, max) {
+      return !(field in data) || data[field] == null ||
+        (data[field] is string && data[field].size() <= max);
+    }
+
     // Composite id convention: "<ownerUid>_<resourceId>".
     function ownedDocId(uid, resourceId) {
       return uid + '_' + resourceId;
@@ -40,8 +53,17 @@ service cloud.firestore {
         (resource.data.status == 'published') ||
         (isSignedIn() && resource.data.createdBy == request.auth.uid);
 
+      // Community submissions only. The key whitelist stops a submitter from
+      // pre-filling counters (ratingAvg, viewCount…) or moderation fields.
       allow create: if
         isSignedIn() &&
+        request.resource.data.keys().hasOnly([
+          'id', 'type', 'title', 'slug', 'sourceName', 'description', 'longDescription',
+          'sourceUrl', 'category', 'level', 'language', 'countries', 'tags', 'license',
+          'licenseUrl', 'author', 'platform', 'featured', 'thumbnailUrl', 'status',
+          'createdBy', 'creatorEmail', 'lastVerified', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.createdAt == request.time &&
         request.resource.data.id == resourceId &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.status == 'pending' &&
@@ -71,9 +93,17 @@ service cloud.firestore {
           request.resource.data.licenseUrl.matches('^https://.*')) &&
         (!('thumbnailUrl' in request.resource.data) ||
           request.resource.data.thumbnailUrl == null ||
-          request.resource.data.thumbnailUrl is string);
+          request.resource.data.thumbnailUrl is string) &&
+        isOptionalString(request.resource.data, 'category', 60) &&
+        isOptionalString(request.resource.data, 'author', 120) &&
+        isOptionalString(request.resource.data, 'slug', 120) &&
+        (!('tags' in request.resource.data) ||
+          (request.resource.data.tags is list && request.resource.data.tags.size() <= 10));
 
-      allow update, delete: if isAdmin();
+      // Every change after submission goes through the admin API (audited,
+      // blocklist-checked, counters reset). Direct browser writes are denied
+      // even for admins, so a revoked admin token cannot be used here either.
+      allow update, delete: if false;
 
       // YouTube lessons are stored in a subcollection so long playlists do not
       // hit Firestore's 1 MiB document limit. Only the Admin SDK (Express API)
@@ -112,25 +142,31 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
 
-      allow create: if
-        isOwner(userId) &&
-        request.resource.data.uid == userId &&
-        request.resource.data.get('role', 'user') == 'user' &&
-        (!('displayName' in request.resource.data) ||
-          request.resource.data.displayName.size() <= 80) &&
-        (!('preferredLanguage' in request.resource.data) ||
-          request.resource.data.preferredLanguage in ['en', 'bn', 'ur']);
+      function validProfile(data) {
+        return writesOnly([
+            'uid', 'email', 'displayName', 'photoURL', 'provider',
+            'preferredLanguage', 'createdAt', 'lastLoginAt', 'emailVerified'
+          ]) &&
+          data.get('uid', userId) == userId &&
+          isOptionalString(data, 'email', 200) &&
+          isOptionalString(data, 'displayName', 80) &&
+          isOptionalString(data, 'photoURL', 600) &&
+          isOptionalString(data, 'provider', 40) &&
+          (!('preferredLanguage' in data) || data.preferredLanguage in ['en', 'bn', 'ur']) &&
+          (!('emailVerified' in data) || data.emailVerified is bool);
+      }
 
+      allow create: if isOwner(userId) && validProfile(request.resource.data);
+
+      // `createdAt` is fixed once written. Admin edits go through the API.
       allow update: if
-        isAdmin() ||
-        (
-          isOwner(userId) &&
-          request.resource.data.uid == resource.data.uid &&
-          request.resource.data.get('role', 'user') == resource.data.get('role', 'user')
-        );
+        isOwner(userId) &&
+        validProfile(request.resource.data) &&
+        request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null);
 
-      // Owners may delete their own account (the delete-account flow).
-      allow delete: if isOwner(userId) || isAdmin();
+      // Account deletion runs through DELETE /api/me so every related document
+      // (bookmarks, progress, notes, roadmaps) is removed too.
+      allow delete: if false;
 
       // Saved AI roadmaps are private to the owner. The document lives at
       // users/{uid}/roadmaps/{roadmapId}, so the path itself is the access
@@ -139,7 +175,16 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
         allow create: if
           isOwner(userId) &&
+          request.resource.data.keys().hasOnly([
+            'userId', 'goal', 'level', 'language', 'title', 'summary', 'steps',
+            'resourceIds', 'createdAt'
+          ]) &&
+          request.resource.data.createdAt == request.time &&
           request.resource.data.userId == userId &&
+          isOptionalString(request.resource.data, 'summary', 1200) &&
+          (!('resourceIds' in request.resource.data) ||
+            (request.resource.data.resourceIds is list &&
+              request.resource.data.resourceIds.size() <= 60)) &&
           isNonEmptyString(request.resource.data.goal) &&
           request.resource.data.goal.size() <= 300 &&
           isNonEmptyString(request.resource.data.title) &&
@@ -155,7 +200,13 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
         allow create, update: if
           isOwner(userId) &&
+          writesOnly([
+            'id', 'userId', 'resourceId', 'videoId', 'videoTitle', 'body',
+            'createdAt', 'updatedAt'
+          ]) &&
+          request.resource.data.id == noteId &&
           request.resource.data.userId == userId &&
+          isOptionalString(request.resource.data, 'videoTitle', 300) &&
           isNonEmptyString(request.resource.data.resourceId) &&
           request.resource.data.resourceId.size() <= 140 &&
           isNonEmptyString(request.resource.data.videoId) &&
@@ -164,22 +215,20 @@ service cloud.firestore {
           request.resource.data.body.size() <= 4000;
       }
 
-      // Legacy personal saved resources. Private to the owner.
+      // Legacy personal saved resources: read-only now. New bookmarks (and
+      // removals, which keep saveCount in sync) go through /api/bookmarks.
       match /bookmarks/{resourceId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
     }
 
     // ---------- bookmarks (userId_resourceId) ----------
+    // Written only by the API (POST/DELETE /api/bookmarks/:resourceId), which
+    // updates the resource's saveCount in the same transaction.
     match /bookmarks/{bookmarkId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if
-        isSignedIn() &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.id == bookmarkId &&
-        bookmarkId == ownedDocId(request.auth.uid, request.resource.data.resourceId);
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow update: if false;
+      allow write: if false;
     }
 
     // ---------- progress (userId_resourceId) ----------
@@ -187,8 +236,15 @@ service cloud.firestore {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create, update: if
         isSignedIn() &&
+        writesOnly([
+          'id', 'userId', 'resourceId', 'status', 'completedVideoIds', 'lastVideoId', 'updatedAt'
+        ]) &&
+        request.resource.data.id == progressId &&
         request.resource.data.userId == request.auth.uid &&
         progressId == ownedDocId(request.auth.uid, request.resource.data.resourceId) &&
+        (!('status' in request.resource.data) ||
+          request.resource.data.status in ['not_started', 'in_progress', 'completed']) &&
+        isOptionalString(request.resource.data, 'lastVideoId', 128) &&
         (
           !('completedVideoIds' in request.resource.data) ||
           (
@@ -209,41 +265,22 @@ service cloud.firestore {
     }
 
     // ---------- reviews ----------
-    // Visible reviews are public. Hidden reviews are only readable by their
-    // author (so their own review still renders) and by admins; the public list
-    // query must include `where('hidden', '==', false)`. Signed-in, verified
-    // users may post one review per resource, edit it, or delete their own.
+    // Visible reviews are public. Hidden reviews are readable by their author
+    // (so their own review still renders) and by admins; the public list query
+    // must include `where('hidden', '==', false)`.
+    //
+    // All writes go through the API (POST /api/reviews, DELETE
+    // /api/reviews/:resourceId): it checks email verification and that the
+    // resource is published, sets the author name server-side, recomputes the
+    // resource's ratingAvg/ratingCount in the same transaction, and refuses to
+    // delete a hidden review (which would otherwise let an author re-post it).
     match /reviews/{reviewId} {
       allow read: if
+        isAdmin() ||
         resource.data.get('hidden', false) == false ||
         (isSignedIn() && resource.data.userId == request.auth.uid);
 
-      allow create: if
-        isSignedIn() &&
-        request.auth.token.email_verified == true &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.hidden == false &&
-        reviewId == ownedDocId(request.resource.data.resourceId, request.auth.uid) &&
-        request.resource.data.rating is number &&
-        request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5 &&
-        isNonEmptyString(request.resource.data.body) &&
-        request.resource.data.body.size() <= 2000;
-
-      // Authors can edit their text/rating but can never change `hidden`; only
-      // the admin API (Admin SDK) may hide or restore a review.
-      allow update: if
-        isSignedIn() &&
-        resource.data.userId == request.auth.uid &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.get('hidden', false) == resource.data.get('hidden', false) &&
-        request.resource.data.rating is number &&
-        request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5 &&
-        isNonEmptyString(request.resource.data.body) &&
-        request.resource.data.body.size() <= 2000;
-
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
     }
 
     // ---------- reports ----------

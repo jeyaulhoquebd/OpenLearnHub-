@@ -56,6 +56,65 @@ export async function readDailyUsage({ uid, dailyLimit, collection = 'aiUsage' }
 }
 
 /**
+ * Atomically reserves one unit of today's quota before the AI call runs, so
+ * parallel requests cannot all pass a read-then-increment check. `field` is
+ * `count` (roadmaps) or `chatCount` (chat). Call `releaseDailyUsage` when the
+ * request fails so a provider error does not cost the user quota. When
+ * Firestore is unavailable this fails open (the hourly limiter still applies).
+ */
+export async function reserveDailyUsage({
+  uid,
+  dailyLimit,
+  field = 'count',
+  action = 'request',
+  collection = 'aiUsage'
+}) {
+  const date = dayKey();
+  const db = getDb();
+  if (!db || !uid) return { used: 0, limit: dailyLimit, allowed: true, reserved: false, date };
+
+  const ref = usageRef(db, collection, uid, date);
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      const used = snap.exists ? Number(snap.data()?.[field]) || 0 : 0;
+      if (used >= dailyLimit) {
+        return { used, limit: dailyLimit, allowed: false, reserved: false, date };
+      }
+      transaction.set(
+        ref,
+        {
+          userId: uid,
+          date,
+          [field]: used + 1,
+          lastAction: action,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      return { used: used + 1, limit: dailyLimit, allowed: true, reserved: true, date };
+    });
+  } catch (error) {
+    console.warn('[quota] Could not reserve daily usage:', error?.message);
+    return { used: 0, limit: dailyLimit, allowed: true, reserved: false, date };
+  }
+}
+
+/** Gives back a reservation made by `reserveDailyUsage`. */
+export async function releaseDailyUsage({ uid, field = 'count', reservation, collection = 'aiUsage' }) {
+  const db = getDb();
+  if (!db || !uid || !reservation?.reserved) return;
+  try {
+    await usageRef(db, collection, uid, reservation.date).set(
+      { [field]: FieldValue.increment(-1) },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn('[quota] Could not release daily usage:', error?.message);
+  }
+}
+
+/**
  * Records one successful AI request against the user's daily quota and the
  * global usage counter. Failures are logged, never thrown.
  */

@@ -99,10 +99,12 @@ export default function LoginPage() {
               <p className="flex items-start gap-2">
                 <Link2 className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  {t('auth.accountExistsDifferent', {
-                    email: pendingLink.email,
-                    provider: t(providerLabelKey(pendingLink.providerId))
-                  })}
+                  {pendingLink.providerId
+                    ? t('auth.accountExistsDifferent', {
+                        email: pendingLink.email,
+                        provider: t(providerLabelKey(pendingLink.providerId))
+                      })
+                    : t('auth.accountExistsUnknown', { email: pendingLink.email })}
                 </span>
               </p>
               {linkedProviderId ? (
@@ -115,9 +117,9 @@ export default function LoginPage() {
                   {activeProvider === linkedProviderId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                   {t('auth.signInWithProvider', { provider: t(providerLabelKey(pendingLink.providerId)) })}
                 </button>
-              ) : (
+              ) : pendingLink.providerId === 'password' ? (
                 <p className="mt-2 text-xs">{t('auth.linkWithPasswordHint')}</p>
-              )}
+              ) : null}
             </div>
           )}
 

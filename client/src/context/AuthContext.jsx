@@ -9,9 +9,6 @@ import {
 } from 'react';
 import {
   createUserWithEmailAndPassword,
-  deleteUser,
-  EmailAuthProvider,
-  fetchSignInMethodsForEmail,
   getRedirectResult,
   GithubAuthProvider,
   GoogleAuthProvider,
@@ -26,14 +23,15 @@ import {
   signOut as firebaseSignOut,
   updateProfile
 } from 'firebase/auth';
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import i18n from '../lib/i18n';
 import { isAccountExistsError, isDismissedPopup } from '../lib/authErrors';
+import { deleteMyAccount } from '../lib/api';
 
 const AuthContext = createContext(null);
 
-/** The four sign-in methods enabled in the Firebase console. */
+/** The social sign-in methods enabled in the Firebase console (plus email/password). */
 export const SIGN_IN_PROVIDERS = ['google', 'github', 'apple'];
 
 function createProvider(providerId) {
@@ -54,6 +52,28 @@ function createProvider(providerId) {
     default:
       throw new Error(`Unsupported sign-in provider: ${providerId}`);
   }
+}
+
+/**
+ * Firebase v9+ puts the conflicting email in `error.customData.email` and the
+ * pending credential must be extracted with the provider's credentialFromError.
+ */
+function credentialFromAuthError(error, providerId) {
+  const extractors = {
+    google: () => GoogleAuthProvider.credentialFromError(error),
+    github: () => GithubAuthProvider.credentialFromError(error),
+    apple: () => OAuthProvider.credentialFromError(error)
+  };
+  const order = providerId ? [providerId] : Object.keys(extractors);
+  for (const key of order) {
+    try {
+      const credential = extractors[key]?.();
+      if (credential) return credential;
+    } catch {
+      /* try the next provider */
+    }
+  }
+  return null;
 }
 
 function providerIdOf(firebaseUser) {
@@ -167,18 +187,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const handleAccountConflict = useCallback(async (error) => {
-    const email = error?.email || '';
-    pendingCredentialRef.current = error?.credential || null;
-    let methods = [];
-    try {
-      methods = await fetchSignInMethodsForEmail(auth, email);
-    } catch {
-      methods = [];
-    }
-    const existingProvider = methods[0] || 'password';
-    setPendingLink({ email, methods, providerId: existingProvider });
-    return { email, methods, providerId: existingProvider };
+  // With Email Enumeration Protection (on by default) Firebase no longer tells
+  // the browser which provider owns an email (fetchSignInMethodsForEmail is
+  // deprecated and returns []). The UI therefore asks the user to sign in with
+  // whichever method they used before; the pending credential is linked then.
+  const handleAccountConflict = useCallback(async (error, attemptedProvider = null) => {
+    const email = error?.customData?.email || error?.email || '';
+    pendingCredentialRef.current = credentialFromAuthError(error, attemptedProvider);
+    const next = { email, methods: [], providerId: null };
+    setPendingLink(next);
+    return next;
   }, []);
 
   const completeSignIn = useCallback(
@@ -261,7 +279,7 @@ export function AuthProvider({ children }) {
         return credential.user;
       } catch (error) {
         if (isAccountExistsError(error)) {
-          await handleAccountConflict(error);
+          await handleAccountConflict(error, providerId);
           throw error;
         }
         if (shouldFallbackToRedirect(error)) {
@@ -280,7 +298,16 @@ export function AuthProvider({ children }) {
       if (displayName) {
         await updateProfile(credential.user, { displayName });
       }
-      await loadProfile(credential.user);
+      const created = await loadProfile(credential.user);
+      // onAuthStateChanged can create the profile before updateProfile runs,
+      // leaving an empty displayName; fill it in now.
+      if (displayName && db && created && !created.displayName) {
+        const name = String(displayName).slice(0, 80);
+        await setDoc(doc(db, 'users', credential.user.uid), { displayName: name }, { merge: true }).catch(
+          () => {}
+        );
+        setProfile((current) => (current ? { ...current, displayName: name } : current));
+      }
       try {
         await sendEmailVerification(credential.user);
       } catch (error) {
@@ -311,6 +338,13 @@ export function AuthProvider({ children }) {
     if (!auth?.currentUser) return null;
     await auth.currentUser.reload();
     const refreshed = auth.currentUser;
+    // reload() updates the user object only; the ID token keeps the old
+    // email_verified claim until it is refreshed, and the API and security
+    // rules read the token.
+    if (refreshed.emailVerified) {
+      await refreshed.getIdToken(true).catch(() => {});
+      setClaims(await readTokenClaims(refreshed));
+    }
     setUser(refreshed);
     if (refreshed.emailVerified && db) {
       setDoc(doc(db, 'users', refreshed.uid), { emailVerified: true }, { merge: true }).catch(() => {});
@@ -334,12 +368,18 @@ export function AuthProvider({ children }) {
   const deleteAccount = useCallback(async () => {
     if (!auth?.currentUser) return;
     const current = auth.currentUser;
-    // Remove the profile first: once the auth user is gone the client can no
-    // longer satisfy the security rules.
-    if (db) {
-      await deleteDoc(doc(db, 'users', current.uid)).catch(() => {});
+    // The API removes the profile, bookmarks, progress, notes and roadmaps,
+    // anonymises reviews and then deletes the Auth account — in that order, so
+    // a failure never leaves a half-deleted account. It needs a recent sign-in.
+    try {
+      await deleteMyAccount(await current.getIdToken());
+    } catch (error) {
+      if (error?.code === 'requires_recent_login') {
+        throw Object.assign(new Error(error.message), { code: 'auth/requires-recent-login' });
+      }
+      throw error;
     }
-    await deleteUser(current);
+    await firebaseSignOut(auth).catch(() => {});
     pendingCredentialRef.current = null;
     setPendingLink(null);
     setProfile(null);
@@ -353,8 +393,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const provider = providerIdOf(user);
-  // Social providers only ever return verified addresses.
-  const isVerified = Boolean(user && (user.emailVerified || provider !== 'password'));
+  // Use Firebase's flag for every provider: GitHub (and some others) can sign
+  // users in with an unverified email, and the API / security rules check the
+  // token's email_verified claim, not the provider.
+  const isVerified = Boolean(user?.emailVerified);
   const isAdmin = claims.admin === true;
 
   const value = useMemo(

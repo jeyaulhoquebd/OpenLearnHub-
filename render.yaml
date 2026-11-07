@@ -45,6 +45,8 @@ services:
         value: "2048"
       - key: AI_DAILY_LIMIT_PER_USER
         value: "10"
+      - key: AI_CHAT_DAILY_LIMIT_PER_USER
+        value: "60"
       # AES-256-GCM key for secrets stored in Firestore settings/ai.
       # Generate with: openssl rand -hex 32
       - key: SETTINGS_ENCRYPTION_KEY

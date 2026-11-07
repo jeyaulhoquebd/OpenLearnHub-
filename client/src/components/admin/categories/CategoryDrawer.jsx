@@ -15,7 +15,6 @@ import {
 
 /** Grid of allowed category icons. Keyboard reachable via `aria-pressed`. */
 function IconPicker({ value, onChange, label, errorId }) {
-  const { t } = useTranslation();
 
   return (
     <div

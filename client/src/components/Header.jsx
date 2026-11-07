@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Menu, Plus, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import Logo from './Logo';
@@ -12,7 +12,6 @@ export default function Header() {
   const { t } = useTranslation();
   const { user, isAdmin } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 

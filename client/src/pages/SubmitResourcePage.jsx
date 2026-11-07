@@ -66,7 +66,7 @@ function Field({ label, hint, required, htmlFor, children, optionalLabel }) {
 
 export default function SubmitResourcePage() {
   const { t } = useTranslation();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { push } = useToast();
   const [form, setForm] = useState(initialForm);
   const [thumbnail, setThumbnail] = useState(null);

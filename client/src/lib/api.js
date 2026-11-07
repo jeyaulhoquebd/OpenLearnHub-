@@ -114,6 +114,52 @@ export function getAiUsage(token, { signal } = {}) {
   return apiRequest('/api/admin/settings/ai/usage', { token, signal });
 }
 
+// ---------------------------------------------------------------------------
+// Community actions that keep shared counters in sync (server-side writes)
+// ---------------------------------------------------------------------------
+
+/** POST /api/reviews — create or edit the caller's review. */
+export function saveReviewApi({ resourceId, rating, body }, token) {
+  return apiRequest('/api/reviews', { method: 'POST', body: { resourceId, rating, body }, token });
+}
+
+/** DELETE /api/reviews/:resourceId */
+export function deleteReviewApi(resourceId, token) {
+  return apiRequest(`/api/reviews/${encodeURIComponent(resourceId)}`, { method: 'DELETE', token });
+}
+
+/** POST /api/bookmarks/:resourceId */
+export function saveBookmarkApi(resourceId, token) {
+  return apiRequest(`/api/bookmarks/${encodeURIComponent(resourceId)}`, { method: 'POST', token });
+}
+
+/** DELETE /api/bookmarks/:resourceId */
+export function removeBookmarkApi(resourceId, token) {
+  return apiRequest(`/api/bookmarks/${encodeURIComponent(resourceId)}`, { method: 'DELETE', token });
+}
+
+/** POST /api/resources/:id/view — fire-and-forget view counter. */
+export function recordResourceView(resourceId, token) {
+  return apiRequest(`/api/resources/${encodeURIComponent(resourceId)}/view`, {
+    method: 'POST',
+    token
+  });
+}
+
+/** DELETE /api/me — deletes the signed-in account and its personal data. */
+export function deleteMyAccount(token) {
+  return apiRequest('/api/me', { method: 'DELETE', token });
+}
+
+/** POST /api/admin/resources/:id/moderate — approve or reject a submission. */
+export function moderateAdminResource(id, { decision, note = '' }, token) {
+  return apiRequest(`/api/admin/resources/${encodeURIComponent(id)}/moderate`, {
+    method: 'POST',
+    body: { decision, note },
+    token
+  });
+}
+
 export function getApiHealth() {
   return apiRequest('/api/health');
 }

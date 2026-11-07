@@ -36,7 +36,7 @@ function DistributionBars({ distribution, count }) {
 
 export default function ReviewSection({ resourceId }) {
   const { t, i18n } = useTranslation();
-  const { user, isVerified, profile, firebaseReady } = useAuth();
+  const { user, isVerified, firebaseReady } = useAuth();
   const { push } = useToast();
   const [reviews, setReviews] = useState([]);
   const [ownReview, setOwnReview] = useState(null);
@@ -90,10 +90,10 @@ export default function ReviewSection({ resourceId }) {
 
   async function onSubmit(values) {
     try {
+      // The server sets the author name from the profile / verified token.
       await saveReview({
         resourceId,
         uid: user.uid,
-        authorName: profile?.displayName || user.displayName || null,
         rating: values.rating,
         body: sanitizeText(values.body, { max: 2000, multiline: true })
       });
@@ -117,7 +117,9 @@ export default function ReviewSection({ resourceId }) {
       await load();
     } catch (error) {
       console.warn('[review-delete]', error);
-      push(t('reviews.error'), { type: 'error' });
+      push(t(error?.code === 'review_moderated' ? 'reviews.moderatedNoDelete' : 'reviews.error'), {
+        type: 'error'
+      });
     }
   }
 

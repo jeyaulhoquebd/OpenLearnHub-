@@ -1,9 +1,12 @@
 import Groq from 'groq-sdk';
 import { config } from '../config.js';
+import { FieldPath } from 'firebase-admin/firestore';
 import { getDb } from '../firebase.js';
 import { formatPublicSiteGuide } from './siteGuide.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const INDEX_PAGE_SIZE = 500;
+const INDEX_MAX_RESOURCES = 5000;
 let indexCache = { items: [], fetchedAt: 0 };
 
 // One SDK client per API key, created lazily. Keys change rarely, so this
@@ -24,7 +27,6 @@ const STOPWORDS = new Set([
 const LOCALE_NAMES = {
   en: 'English',
   bn: 'Bangla (Bengali)',
-  hi: 'Hindi',
   ur: 'Urdu'
 };
 
@@ -60,13 +62,24 @@ async function loadResourceIndex() {
   if (!db) return [];
 
   try {
-    const snapshot = await db
-      .collection('resources')
-      .where('status', '==', 'published')
-      .limit(500)
-      .get();
+    // Page through the whole published library (not just the first 500).
+    const docs = [];
+    let last = null;
+    while (docs.length < INDEX_MAX_RESOURCES) {
+      let query = db
+        .collection('resources')
+        .where('status', '==', 'published')
+        .orderBy(FieldPath.documentId())
+        .limit(INDEX_PAGE_SIZE);
+      if (last) query = query.startAfter(last);
+      // eslint-disable-next-line no-await-in-loop
+      const page = await query.get();
+      docs.push(...page.docs);
+      if (page.size < INDEX_PAGE_SIZE) break;
+      last = page.docs[page.docs.length - 1];
+    }
 
-    const items = snapshot.docs
+    const items = docs
       .map((doc) => {
         const data = doc.data();
         return {
@@ -289,6 +302,14 @@ function classifyGroqError(error) {
   return { code: 'llm_error', status, retryAfter };
 }
 
+/** Removes model "thinking" blocks so they never reach the user or the JSON parser. */
+export function stripReasoning(value) {
+  return String(value || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/^[\s\S]*?<\/think>/i, '')
+    .trim();
+}
+
 /**
  * Shared Groq chat-completion call with a hard 15s timeout and normalised
  * error codes. `ai` is `{ apiKey, model }` from lib/settings.js.
@@ -305,31 +326,28 @@ async function callGroq({
     throw Object.assign(new Error('The AI provider is not configured.'), { code: 'llm_unavailable' });
   }
 
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(
-        Object.assign(new Error('The AI provider took too long to respond.'), {
-          code: 'llm_timeout'
-        })
-      );
-    }, config.groq.timeoutMs);
-  });
+  // Abort the underlying HTTP request on timeout instead of leaving it running.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.groq.timeoutMs);
 
   let response;
   try {
-    response = await Promise.race([
-      client.chat.completions.create({
+    response = await client.chat.completions.create(
+      {
         model: ai.model || config.groq.model,
         messages,
         temperature,
         max_tokens: maxOutputTokens || config.groq.maxOutputTokens,
         ...(json ? { response_format: { type: 'json_object' } } : {})
-      }),
-      timeout
-    ]);
+      },
+      { signal: controller.signal }
+    );
   } catch (error) {
-    if (error?.code === 'llm_timeout') throw error;
+    if (controller.signal.aborted || error?.name === 'APIUserAbortError') {
+      throw Object.assign(new Error('The AI provider took too long to respond.'), {
+        code: 'llm_timeout'
+      });
+    }
     const info = classifyGroqError(error);
     // Log only the provider status/kind: never the request headers, key, or body.
     console.error('[ai] Groq request failed:', info.status || info.code);
@@ -338,7 +356,8 @@ async function callGroq({
     clearTimeout(timeoutId);
   }
 
-  const text = String(response?.choices?.[0]?.message?.content || '').trim();
+  // Reasoning models (e.g. Qwen3) may prepend a <think>…</think> block.
+  const text = stripReasoning(response?.choices?.[0]?.message?.content);
   if (!text) {
     throw Object.assign(new Error('The AI provider returned an empty response.'), {
       code: 'llm_empty'

@@ -25,7 +25,7 @@ export function ThemeProvider({ children }) {
     setThemeState(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
-    } catch (error) {
+    } catch {
       /* storage may be unavailable in private mode */
     }
   }, []);
@@ -35,7 +35,7 @@ export function ThemeProvider({ children }) {
       const next = current === 'dark' ? 'light' : 'dark';
       try {
         window.localStorage.setItem(STORAGE_KEY, next);
-      } catch (error) {
+      } catch {
         /* storage may be unavailable in private mode */
       }
       return next;

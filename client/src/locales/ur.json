@@ -228,7 +228,8 @@
     "confirmDelete": "اس وسیلے پر اپنا جائزہ حذف کریں؟",
     "error": "آپ کا جائزہ محفوظ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
     "anonymous": "سیکھنے والا",
-    "you": "آپ"
+    "you": "آپ",
+    "moderatedNoDelete": "ایک ماڈریٹر نے یہ ریویو چھپا دیا ہے، اس لیے اسے حذف یا دوبارہ پوسٹ نہیں کیا جا سکتا۔"
   },
   "progress": {
     "title": "آپ کی پیش رفت",
@@ -345,7 +346,8 @@
     "deleteAccountConfirm": "جی ہاں، میرا اکاؤنٹ حذف کریں",
     "deleteAccountSuccess": "آپ کا اکاؤنٹ حذف کر دیا گیا ہے۔",
     "signInMethod": "سائن اِن کا طریقہ",
-    "preferredLanguage": "پسندیدہ زبان"
+    "preferredLanguage": "پسندیدہ زبان",
+    "accountExistsUnknown": "{{email}} کے لیے ایک اکاؤنٹ پہلے سے موجود ہے۔ پہلے والے طریقے (Google، GitHub، Apple، یا ای میل اور پاس ورڈ) سے سائن اِن کریں، پھر نیا طریقہ لنک ہو جائے گا۔"
   },
   "validation": {
     "required": "یہ خانہ لازمی ہے۔",
