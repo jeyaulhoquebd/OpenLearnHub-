@@ -1,0 +1,14 @@
+# Cloudflare Pages response headers (mirrors firebase.json "hosting.headers").
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://apis.google.com https://www.youtube.com https://s.ytimg.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://*.firebaseapp.com https://www.youtube.com https://www.youtube-nocookie.com https://accounts.google.com https://github.com https://appleid.apple.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/index.html
+  Cache-Control: no-cache

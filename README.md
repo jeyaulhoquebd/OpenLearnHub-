@@ -690,6 +690,20 @@ npx firebase-tools deploy --only hosting
 
 Route titles and meta descriptions are set per page via `usePageMeta`. The audited pages score 100 for Accessibility, Best Practices, and SEO in Lighthouse. Keep heading levels ordered (one `<h1>` per page, no skipped levels) and preserve the `sr-only` context on terse links such as "Learn more" and "View all".
 
+### Frontend — Cloudflare Pages (alternative)
+
+A `*.pages.dev` address only exists after a Pages project with that exact name has been created **and** has at least one successful deployment. Until then the browser shows `DNS_PROBE_POSSIBLE` / "DNS address could not be found". If the name was already taken, Cloudflare adds a suffix (for example `openlearnhub-abc.pages.dev`), so check the real URL in the dashboard.
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**, pick this repository.
+2. Project name: `openlearnhub` (this becomes `openlearnhub.pages.dev`).
+3. Build settings: framework preset **None**, build command `npm run build`, build output directory `client/dist`, root directory empty (repository root). Node 20 comes from `.nvmrc`.
+4. Environment variables (Production **and** Preview): every `VITE_FIREBASE_*` value, `VITE_API_URL` (your Render URL — the build fails without it), `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`, `VITE_SITE_URL=https://openlearnhub.pages.dev`.
+5. Save and deploy, then wait for the first build to succeed.
+6. Firebase console → Authentication → Settings → **Authorized domains**: add `openlearnhub.pages.dev`.
+7. On the API (Render), add `https://openlearnhub.pages.dev` to `CLIENT_ORIGIN` and redeploy.
+
+`client/public/_redirects` makes client-side routes work and `client/public/_headers` applies the same security headers as Firebase Hosting.
+
 ### Backend — Render / Railway / Cloud Run
 
 The Express app is a standard Node service. It is independent of Cloud Functions.
